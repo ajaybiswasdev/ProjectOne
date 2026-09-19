@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bench Management Dashboard — 1 Sep 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700;1,900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LANDING SCREEN
+═══════════════════════════════════════════════════════════════════════════ */
+#landingScreen {
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(160deg,#dde6f4 0%,#e8edf6 40%,#edf1f9 100%);
+  font-family:'Inter',system-ui,sans-serif;
+  display:flex;flex-direction:column;
+  opacity:1;transition:opacity .45s ease;
+  overflow-y:auto;
+}
+#landingScreen.fade-out{opacity:0;pointer-events:none;}
+
+/* nav */
+.ln-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 40px;
+  border-bottom:1px solid rgba(26,58,110,.08);
+  background:rgba(237,241,249,.85);
+  backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:10;
+}
+.ln-logo{display:flex;align-items:center;gap:10px;font-size:13px;color:#1a3a6e;}
+.ln-logo strong{font-size:14px;font-weight:800;letter-spacing:.5px;color:#0f2759;}
+.ln-logo-sep{width:5px;height:5px;border-radius:50%;background:#e36120;}
+.ln-logo-title{color:#4a6080;font-weight:500;}
+.ln-open-btn{
+  padding:10px 22px;border-radius:8px;
+  background:#1B3A8A;color:#fff;
+  font-size:13px;font-weight:700;font-family:'Inter',sans-serif;
+  border:none;cursor:pointer;letter-spacing:.2px;
+  transition:background .18s,transform .15s;
+  box-shadow:0 4px 14px rgba(27,58,138,.35);
+}
+.ln-open-btn:hover{background:#132e72;transform:translateY(-1px);}
+
+/* hero */
+.ln-hero{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;
+  padding:64px 40px 40px;
+  position:relative;
+}
+.ln-hero::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:900px;height:600px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(100,140,220,.12) 0%,transparent 70%);
+  pointer-events:none;
+}
+.ln-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 16px;border-radius:30px;
+  background:rgba(255,255,255,.7);border:1px solid rgba(26,58,110,.12);
+  font-size:11px;font-weight:700;letter-spacing:.9px;color:#2a4a88;
+  margin-bottom:32px;
+  box-shadow:0 2px 12px rgba(26,58,110,.08);
+}
+.ln-badge-dot{width:7px;height:7px;border-radius:50%;background:#e36120;animation:lpulse 1.8s infinite;}
+@keyframes lpulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+.ln-heading{
+  font-family:'Playfair Display',Georgia,serif;
+  font-size:clamp(40px,5vw,72px);
+  font-weight:900;line-height:1.12;
+  color:#0d1d45;
+  max-width:820px;margin:0 auto 24px;
+  letter-spacing:-.5px;
+}
+.ln-heading em{
+  font-style:italic;color:#2563eb;
+}
+
+.ln-sub{
+  font-size:17px;color:#4a6080;line-height:1.7;
+  max-width:560px;margin:0 auto 40px;font-weight:400;
+}
+
+.ln-btns{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;}
+.ln-cta-primary{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:15px 32px;border-radius:10px;
+  background:#1B3A8A;color:#fff;
+  font-size:15px;font-weight:700;font-family:'Inter',sans-serif;
+  border:none;cursor:pointer;
+  box-shadow:0 6px 20px rgba(27,58,138,.4);
+  transition:background .18s,transform .15s,box-shadow .18s;
+}
+.ln-cta-primary:hover{background:#132e72;transform:translateY(-2px);box-shadow:0 10px 28px rgba(27,58,138,.45);}
+.ln-cta-secondary{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:14px 28px;border-radius:10px;
+  background:rgba(255,255,255,.75);color:#1a3a6e;
+  font-size:15px;font-weight:600;font-family:'Inter',sans-serif;
+  border:1.5px solid rgba(26,58,110,.15);cursor:pointer;
+  box-shadow:0 2px 12px rgba(26,58,110,.08);
+  transition:background .18s,transform .15s;
+}
+.ln-cta-secondary:hover{background:#fff;transform:translateY(-2px);}
+
+/* stats bar */
+.ln-stats{
+  display:flex;align-items:stretch;gap:0;
+  background:rgba(255,255,255,.6);
+  border:1px solid rgba(26,58,110,.1);
+  border-radius:16px;
+  margin:52px auto 0;
+  max-width:820px;width:100%;
+  box-shadow:0 4px 20px rgba(26,58,110,.08);
+  overflow:hidden;
+}
+.ln-stat{
+  flex:1;padding:22px 20px;text-align:center;
+  border-right:1px solid rgba(26,58,110,.08);
+  transition:background .18s;
+}
+.ln-stat:last-child{border-right:none;}
+.ln-stat:hover{background:rgba(255,255,255,.85);}
+.ln-stat-num{font-size:34px;font-weight:800;color:#0d1d45;font-family:'Playfair Display',serif;line-height:1;}
+.ln-stat-lbl{font-size:11px;color:#6a80a0;margin-top:5px;font-weight:500;}
+
+/* section cards */
+.ln-cards-wrap{padding:52px 40px 60px;max-width:1100px;margin:0 auto;width:100%;}
+.ln-cards-head{font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#4a6080;margin-bottom:20px;}
+.ln-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.ln-card{
+  background:rgba(255,255,255,.72);border:1px solid rgba(26,58,110,.09);
+  border-radius:16px;padding:24px;cursor:pointer;text-align:left;
+  text-decoration:none;color:inherit;
+  transition:transform .18s,box-shadow .18s,background .18s;
+  box-shadow:0 2px 12px rgba(26,58,110,.06);
+  display:flex;flex-direction:column;gap:10px;
+  position:relative;overflow:hidden;
+}
+.ln-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(26,58,110,.12);background:rgba(255,255,255,.92);}
+.ln-card-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;}
+.ln-card-title{font-size:15px;font-weight:800;color:#0d1d45;font-family:'Playfair Display',serif;}
+.ln-card-desc{font-size:12px;color:#5a7090;line-height:1.55;flex:1;}
+.ln-card-pills{display:flex;gap:6px;flex-wrap:wrap;}
+.ln-pill{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.ln-card-arrow{
+  position:absolute;top:20px;right:18px;
+  font-size:16px;color:#b0bdd0;transition:color .18s,transform .18s;
+}
+.ln-card:hover .ln-card-arrow{color:#2563eb;transform:translateX(3px);}
+</style>
+<style>
+:root {
+  --bg:#e8eaf6;--shadow-dark:#b0b8d8;--shadow-light:#ffffff;
+  --primary:#7986cb;--primary-dark:#5c6bc0;
+  --success:#66bb9a;--warning:#f4a96a;--danger:#e97b8a;
+  --text-primary:#2d3748;--text-secondary:#718096;--text-muted:#a0aec0;
+  --card-radius:20px;
+  --p-lavender:#c5b8f0;--p-mint:#84d8b8;--p-rose:#f09db0;
+  --p-sky:#87c4ef;--p-peach:#f8c09a;--p-sage:#a8d4a8;
+  --p-lilac:#d4a8e8;--p-coral:#f4a094;--p-teal:#80cece;--p-cream:#f8e6a8;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);background-image:radial-gradient(ellipse at 15% 10%,rgba(197,184,240,.25) 0%,transparent 50%),radial-gradient(ellipse at 85% 25%,rgba(135,196,239,.2) 0%,transparent 45%),radial-gradient(ellipse at 50% 92%,rgba(132,216,184,.18) 0%,transparent 50%);font-family:'Segoe UI',system-ui,sans-serif;color:var(--text-primary);min-height:100vh;padding:12px;}
+.neo{background:var(--bg);border-radius:var(--card-radius);box-shadow:6px 6px 16px var(--shadow-dark),-6px -6px 16px var(--shadow-light);}
+.neo-sm{background:var(--bg);border-radius:14px;box-shadow:4px 4px 10px var(--shadow-dark),-4px -4px 10px var(--shadow-light);}
+.neo-inset{background:var(--bg);border-radius:12px;box-shadow:inset 4px 4px 10px var(--shadow-dark),inset -4px -4px 10px var(--shadow-light);}
+.dash-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;margin-bottom:10px;}
+.dash-header h1{font-size:18px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px;}
+.dash-header p{font-size:11px;color:var(--text-secondary);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:8px;}
+.live-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--success);border-radius:20px;box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+.date-chip{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);}
+.tab-nav-wrap{position:sticky;top:0;z-index:100;margin-bottom:10px;}
+.tab-nav{display:flex;gap:5px;padding:7px 14px;flex-wrap:wrap;}
+.tab-nav-btn{display:flex;align-items:center;gap:5px;padding:6px 13px;font-size:11px;font-weight:600;color:var(--text-muted);border-radius:10px;background:var(--bg);box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);border:none;cursor:pointer;transition:all .18s;white-space:nowrap;}
+.tab-nav-btn:hover{color:var(--text-secondary);}
+.tab-nav-btn.active{box-shadow:inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light);color:var(--primary-dark);background:linear-gradient(135deg,rgba(197,184,240,.22),rgba(135,196,239,.18));}
+.home-btn{display:flex;align-items:center;gap:5px;padding:6px 13px;font-size:11px;font-weight:600;color:#5c6bc0;border-radius:10px;background:linear-gradient(135deg,rgba(197,184,240,.28),rgba(135,196,239,.2));box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);border:none;cursor:pointer;margin-left:auto;transition:box-shadow .15s;}.home-btn:hover{box-shadow:4px 4px 12px var(--shadow-dark),-4px -4px 12px var(--shadow-light);color:var(--primary-dark);}
+.pod-filter-bar{display:flex;align-items:center;gap:10px;padding:7px 14px;background:var(--bg);border-radius:14px;box-shadow:4px 4px 10px var(--shadow-dark),-4px -4px 10px var(--shadow-light);margin-bottom:10px;flex-wrap:wrap;}
+.pod-filter-bar label{font-size:10px;font-weight:700;color:var(--text-secondary);white-space:nowrap;}
+.pod-select{font-size:11px;font-weight:600;color:var(--text-primary);background:var(--bg);border:none;border-radius:8px;padding:5px 10px;box-shadow:inset 2px 2px 5px var(--shadow-dark),inset -2px -2px 5px var(--shadow-light);cursor:pointer;outline:none;min-width:160px;}
+.pod-select:focus{box-shadow:inset 3px 3px 7px var(--shadow-dark),inset -3px -3px 7px var(--shadow-light);}
+.pod-clear-btn{font-size:10px;font-weight:700;color:var(--primary-dark);background:linear-gradient(135deg,rgba(197,184,240,.25),rgba(135,196,239,.15));border:none;border-radius:8px;padding:5px 12px;cursor:pointer;box-shadow:2px 2px 6px var(--shadow-dark),-2px -2px 6px var(--shadow-light);}
+.pod-clear-btn:hover{box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);}
+.tab-section{display:none;}.tab-section.active{display:block;}
+.tab-header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.section-label{font-size:12px;font-weight:700;color:var(--text-secondary);padding-left:10px;border-left:3px solid;border-image:linear-gradient(180deg,var(--p-lavender),var(--p-sky)) 1;}
+.tab-header-row .section-label{margin-bottom:0;}
+.dl-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:11px;font-weight:700;color:var(--primary-dark);border-radius:10px;background:var(--bg);box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);border:none;cursor:pointer;transition:all .18s;}
+.dl-btn:hover{box-shadow:4px 4px 11px var(--shadow-dark),-4px -4px 11px var(--shadow-light);}
+.dl-btn:active{box-shadow:inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.mb-20{margin-bottom:10px;}.mb-28{margin-bottom:10px;}
+.kpi-card{padding:12px 14px;position:relative;overflow:hidden;}
+.kpi-icon{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;margin-bottom:7px;box-shadow:2px 2px 6px var(--shadow-dark),-2px -2px 6px var(--shadow-light);}
+.kpi-value{font-size:22px;font-weight:800;line-height:1;color:var(--text-primary);letter-spacing:-1px;}
+.kpi-label{font-size:10px;color:var(--text-secondary);margin-top:3px;font-weight:500;}
+.kpi-trend{display:inline-flex;align-items:center;gap:3px;margin-top:5px;font-size:9px;font-weight:600;padding:2px 6px;border-radius:6px;}
+.trend-up{background:rgba(132,216,184,.2);color:#2e7d6e;}
+.trend-down{background:rgba(240,157,176,.2);color:#b5364a;}
+.trend-warn{background:rgba(248,192,154,.2);color:#b5641a;}
+.kpi-accent{position:absolute;bottom:-10px;right:-10px;width:50px;height:50px;border-radius:50%;opacity:.08;}
+.chart-card{padding:12px 14px;}
+.chart-card h3{font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:2px;}
+.chart-card .sub{font-size:10px;color:var(--text-muted);margin-bottom:8px;}
+.chart-wrap{position:relative;}
+.prog-wrap{width:100%;height:8px;border-radius:10px;box-shadow:inset 2px 2px 5px var(--shadow-dark),inset -2px -2px 5px var(--shadow-light);overflow:hidden;}
+.prog-fill{height:100%;border-radius:10px;transition:width .4s;}
+.aging-row{display:flex;align-items:center;gap:14px;margin-bottom:12px;}
+.aging-label{font-size:12px;font-weight:600;color:var(--text-secondary);min-width:100px;}
+.aging-bar-wrap{flex:1;height:30px;border-radius:8px;box-shadow:inset 3px 3px 7px var(--shadow-dark),inset -3px -3px 7px var(--shadow-light);overflow:hidden;}
+.aging-bar{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:10px;font-size:11px;font-weight:700;color:#fff;}
+.aging-count{font-size:14px;font-weight:800;min-width:30px;text-align:right;}
+.aging-days{font-size:10px;color:var(--text-muted);min-width:55px;text-align:right;}
+.neo-table{width:100%;border-collapse:separate;border-spacing:0 5px;font-size:12px;}
+.neo-table thead th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);padding:5px 12px;text-align:left;}
+.neo-table tbody tr{background:var(--bg);box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);border-radius:12px;transition:box-shadow .15s;}
+.neo-table tbody tr:hover{box-shadow:4px 4px 12px var(--shadow-dark),-4px -4px 12px var(--shadow-light);}
+.neo-table tbody td{padding:9px 12px;color:var(--text-primary);font-weight:500;}
+.neo-table tbody td:first-child{border-radius:12px 0 0 12px;}
+.neo-table tbody td:last-child{border-radius:0 12px 12px 0;}
+.pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;}
+.pill-green{background:rgba(132,216,184,.28);color:#2e7d6e;}
+.pill-red{background:rgba(240,157,176,.28);color:#b5364a;}
+.pill-yellow{background:rgba(248,192,154,.30);color:#b5641a;}
+.pill-blue{background:rgba(135,196,239,.30);color:#2a78aa;}
+.pill-purple{background:rgba(212,168,232,.30);color:#6b3fa0;}
+.pill-gray{background:rgba(160,174,192,.2);color:#4a5568;}
+.pill-orange{background:rgba(244,160,148,.28);color:#c04030;}
+.skill-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);margin:5px;font-size:12px;font-weight:600;color:var(--text-primary);}
+.skill-chip .sc-count{font-size:16px;font-weight:800;}
+.stat-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(163,177,198,.3);}
+.stat-row:last-child{border-bottom:none;}
+.stat-key{font-size:12px;color:var(--text-secondary);}
+.stat-val{font-size:14px;font-weight:700;color:var(--text-primary);}
+.pipeline-item{display:flex;align-items:center;gap:14px;padding:11px 16px;border-radius:14px;margin-bottom:8px;box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);}
+.ro-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
+.ro-name{font-size:13px;font-weight:700;color:var(--text-primary);}
+.ro-meta{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.ro-days{margin-left:auto;text-align:right;}
+.ro-days .d-num{font-size:18px;font-weight:800;}
+.ro-days .d-lbl{font-size:10px;color:var(--text-muted);}
+.search-box{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:12px;box-shadow:inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light);margin-bottom:16px;}
+.search-box input{border:none;background:transparent;outline:none;font-size:13px;color:var(--text-primary);width:100%;font-family:inherit;}
+.search-box input::placeholder{color:var(--text-muted);}
+.filter-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.filter-chip{padding:5px 14px;font-size:11px;font-weight:600;border-radius:8px;background:var(--bg);box-shadow:2px 2px 6px var(--shadow-dark),-2px -2px 6px var(--shadow-light);border:none;cursor:pointer;color:var(--text-muted);transition:all .15s;}
+.filter-chip.active{box-shadow:inset 2px 2px 6px var(--shadow-dark),inset -2px -2px 6px var(--shadow-light);color:var(--primary-dark);}
+.loc-bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.loc-name{font-size:12px;font-weight:600;color:var(--text-secondary);min-width:130px;}
+.loc-bar-wrap{flex:1;height:24px;border-radius:6px;box-shadow:inset 2px 2px 6px var(--shadow-dark),inset -2px -2px 6px var(--shadow-light);overflow:hidden;}
+.loc-bar{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;}
+.loc-count{font-size:13px;font-weight:800;min-width:30px;text-align:right;}
+@media(max-width:1200px){.grid-5{grid-template-columns:repeat(3,1fr);}.grid-4{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:900px){.grid-3,.grid-2{grid-template-columns:1fr;}.grid-4{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     LANDING SCREEN (full-screen overlay, dismissed on "Launch Dashboard")
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="landingScreen">
+
+  <!-- Nav -->
+  <nav class="ln-nav">
+    <div class="ln-logo">
+      <strong>BMD</strong>
+      <span class="ln-logo-sep"></span>
+      <span class="ln-logo-title">Bench Management Dashboard</span>
+    </div>
+    <button class="ln-open-btn" onclick="openDashboard()">Open App →</button>
+  </nav>
+
+  <!-- Hero -->
+  <section class="ln-hero">
+    <div class="ln-badge">
+      <span class="ln-badge-dot"></span>
+      DATA &amp; AI PRACTICE · INTERNAL TOOL
+    </div>
+
+    <h1 class="ln-heading">
+      Bench data that Sales<br/>
+      <em>and Delivery both trust.</em>
+    </h1>
+
+    <p class="ln-sub">
+      Stop guessing who's available. A live, role-aware view of every resource —
+      from fresh joiner to billable — with skill drill-down, aging alerts, and
+      full accountability at every stage.
+    </p>
+
+    <div class="ln-btns">
+      <button class="ln-cta-primary" onclick="openDashboard()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg>
+        Launch Dashboard
+      </button>
+      <button class="ln-cta-secondary" onclick="document.getElementById('lnCardsSection').scrollIntoView({behavior:'smooth'})">
+        See what's inside ↓
+      </button>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="ln-stats">
+      <div class="ln-stat">
+        <div class="ln-stat-num">238</div>
+        <div class="ln-stat-lbl">On Bench · 1 Sep 2026</div>
+      </div>
+      <div class="ln-stat">
+        <div class="ln-stat-num" style="color:#2563eb;">191</div>
+        <div class="ln-stat-lbl">Deployable Resources</div>
+      </div>
+      <div class="ln-stat">
+        <div class="ln-stat-num" style="color:#6b3fa0;">28</div>
+        <div class="ln-stat-lbl">In IFB Pipeline</div>
+      </div>
+      <div class="ln-stat">
+        <div class="ln-stat-num" style="color:#c0392b;">21</div>
+        <div class="ln-stat-lbl">Critical Aged (91+ days)</div>
+      </div>
+      <div class="ln-stat">
+        <div class="ln-stat-num" style="color:#1a7a5a;">12</div>
+        <div class="ln-stat-lbl">Skill Domains Tracked</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section cards -->
+  <div class="ln-cards-wrap" id="lnCardsSection">
+    <div class="ln-cards-head">Explore Dashboard Sections</div>
+    <div class="ln-cards">
+
+      <a class="ln-card" onclick="openDashboard('overview')">
+        <span class="ln-card-arrow">→</span>
+        <div class="ln-card-icon" style="background:#eef2ff;">📊</div>
+        <div class="ln-card-title">Overview</div>
+        <div class="ln-card-desc">KPI summary, practice composition, aging snapshot, status breakdown, and the source-wise resource flow.</div>
+        <div class="ln-card-pills">
+          <span class="ln-pill" style="background:#e0e7ff;color:#3730a3;">238 Resources</span>
+          <span class="ln-pill" style="background:#dcfce7;color:#166534;">80% Deployable</span>
+        </div>
+      </a>
+
+      <a class="ln-card" onclick="openDashboard('aging')">
+        <span class="ln-card-arrow">→</span>
+        <div class="ln-card-icon" style="background:#fff1f2;">⏳</div>
+        <div class="ln-card-title">Aging Analysis</div>
+        <div class="ln-card-desc">Breakdown of bench duration by practice and bucket. Flag critical-aged resources requiring immediate action.</div>
+        <div class="ln-card-pills">
+          <span class="ln-pill" style="background:#ffe4e6;color:#9f1239;">21 Critical (91+d)</span>
+          <span class="ln-pill" style="background:#ffedd5;color:#9a3412;">21 Watch (61–90d)</span>
+        </div>
+      </a>
+
+      <a class="ln-card" onclick="openDashboard('skills')">
+        <span class="ln-card-arrow">→</span>
+        <div class="ln-card-icon" style="background:#eff6ff;">🧠</div>
+        <div class="ln-card-title">Skills on Bench</div>
+        <div class="ln-card-desc">Skill distribution, seniority matrix, and quick availability cards. Click any skill to download a resource Excel.</div>
+        <div class="ln-card-pills">
+          <span class="ln-pill" style="background:#dbeafe;color:#1e40af;">68 Big Data</span>
+          <span class="ln-pill" style="background:#ede9fe;color:#5b21b6;">38 Data Science</span>
+        </div>
+      </a>
+
+      <a class="ln-card" onclick="openDashboard('pipeline')">
+        <span class="ln-card-arrow">→</span>
+        <div class="ln-card-icon" style="background:#faf5ff;">🎯</div>
+        <div class="ln-card-title">IFB Pipeline</div>
+        <div class="ln-card-desc">Resources in active interview and deployment pipeline — IFB-Selected, IFB-Reserved, and Pipeline Planned.</div>
+        <div class="ln-card-pills">
+          <span class="ln-pill" style="background:#ede9fe;color:#5b21b6;">27 IFB-Selected</span>
+          <span class="ln-pill" style="background:#ffedd5;color:#9a3412;">10 IFB-Reserved</span>
+        </div>
+      </a>
+
+      <a class="ln-card" onclick="openDashboard('register')">
+        <span class="ln-card-arrow">→</span>
+        <div class="ln-card-icon" style="background:#f0fdf4;">📋</div>
+        <div class="ln-card-title">Bench Register</div>
+        <div class="ln-card-desc">Searchable, filterable roster of all 238 bench resources with real-time filter chips and Excel download.</div>
+        <div class="ln-card-pills">
+          <span class="ln-pill" style="background:#dcfce7;color:#166534;">Live Search</span>
+          <span class="ln-pill" style="background:#dbeafe;color:#1e40af;">Download Excel</span>
+        </div>
+      </a>
+
+      <a class="ln-card" onclick="openDashboard('location')">
+        <span class="ln-card-arrow">→</span>
+        <div class="ln-card-icon" style="background:#fff7ed;">📍</div>
+        <div class="ln-card-title">Location &amp; Experience</div>
+        <div class="ln-card-desc">Geographic spread across cities, experience buckets, and designation-level distribution for staffing planning.</div>
+        <div class="ln-card-pills">
+          <span class="ln-pill" style="background:#ffedd5;color:#9a3412;">Location A · 159</span>
+          <span class="ln-pill" style="background:#f3f4f6;color:#374151;">0–3yr · 131 (51%)</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+</div>
+<!-- /landingScreen -->
+
+<header class="neo dash-header mb-28">
+  <div>
+    <h1>Bench Management Dashboard</h1>
+    <p>Data &amp; AI Practice · Bench Report as of 1 Sep 2026</p>
+  </div>
+  <div class="header-right">
+    <div class="live-badge neo-sm"><span class="live-dot"></span>Live</div>
+    <div class="date-chip neo-sm">📅 1 Sep 2026</div>
+    <button class="dl-btn" onclick="downloadAll()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export All
+    </button>
+  </div>
+</header>
+
+<div class="neo tab-nav-wrap">
+  <nav class="tab-nav">
+    <button class="tab-nav-btn active" data-tab="overview">📊 Overview</button>
+    <button class="tab-nav-btn" data-tab="aging">⏱ Aging Analysis</button>
+    <button class="tab-nav-btn" data-tab="skills">🧠 Skills on Bench</button>
+    <button class="tab-nav-btn" data-tab="pipeline">🎯 IFB Pipeline</button>
+    <button class="tab-nav-btn" data-tab="register">📋 Bench Register</button>
+    <button class="tab-nav-btn" data-tab="location">📍 Location &amp; Experience</button>
+    <button class="home-btn" onclick="goHome()">🏠 Home</button>
+  </nav>
+</div>
+
+<!-- ═══ TAB 1 — OVERVIEW ═══ -->
+<div class="tab-section active" id="tab-overview">
+  <div class="tab-header-row">
+    <div class="section-label">Bench Overview — 1 Sep 2026</div>
+    <button class="dl-btn" onclick="downloadTab('overview')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Excel</button>
+  </div>
+  <!-- 9 KPI cards — single compact row -->
+  <div style="display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin-bottom:10px;">
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(197,184,240,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(197,184,240,.55),rgba(167,154,220,.35));">🏖️</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">238</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Total on Bench</div><div style="font-size:8px;color:#b5641a;margin-top:2px;font-weight:600;">1 Sep 2026</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-lavender);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(248,192,154,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(248,192,154,.55),rgba(228,162,124,.35));">⏱</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">34d</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Avg Bench Duration</div><div style="font-size:8px;color:#b5641a;margin-top:2px;font-weight:600;">47d non-zero avg</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-peach);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(132,216,184,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(132,216,184,.55),rgba(100,186,154,.35));">✅</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">191</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Deployable</div><div style="font-size:8px;color:#2e7d6e;margin-top:2px;font-weight:600;">80.3% of bench</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-mint);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(240,157,176,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(240,157,176,.55),rgba(210,127,146,.35));">🚨</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">21</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Critical Aged</div><div style="font-size:8px;color:#b5364a;margin-top:2px;font-weight:600;">&gt;91 days — Act now</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-rose);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(212,168,232,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(212,168,232,.55),rgba(182,138,202,.35));">🎯</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">28</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">IFB / Interview</div><div style="font-size:8px;color:#6b3fa0;margin-top:2px;font-weight:600;">In deployment pipeline</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-lilac);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(135,196,239,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(135,196,239,.5),rgba(105,166,209,.3));">🟢</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">153</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Available (Open)</div><div style="font-size:8px;color:#2a78aa;margin-top:2px;font-weight:600;">64.3% of bench</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-sky);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(168,212,168,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(168,212,168,.5),rgba(138,192,138,.3));">📚</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">20</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Upskilling</div><div style="font-size:8px;color:#2e7060;margin-top:2px;font-weight:600;">Active L&amp;D</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-sage);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(248,230,168,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(248,230,168,.5),rgba(218,200,138,.3));">📋</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">16</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Proposed</div><div style="font-size:8px;color:#8a6a00;margin-top:2px;font-weight:600;">Submitted to client</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-cream);opacity:.09;"></div>
+    </div>
+
+    <div class="neo" style="padding:9px 11px;display:flex;align-items:center;gap:8px;background:linear-gradient(145deg,rgba(244,160,148,.18),var(--bg));border-radius:14px;overflow:hidden;position:relative;">
+      <div style="width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);background:linear-gradient(135deg,rgba(244,160,148,.5),rgba(214,130,118,.3));">🔴</div>
+      <div><div style="font-size:17px;font-weight:800;color:var(--text-primary);line-height:1;">47</div><div style="font-size:9px;color:var(--text-secondary);margin-top:2px;font-weight:500;">Non Deployable</div><div style="font-size:8px;color:#b5364a;margin-top:2px;font-weight:600;">19.7% of bench</div></div>
+      <div style="position:absolute;bottom:-8px;right:-8px;width:40px;height:40px;border-radius:50%;background:var(--p-coral);opacity:.09;"></div>
+    </div>
+
+  </div>
+
+  <div class="grid-3 mb-28">
+    <div class="neo chart-card">
+      <h3>Bench by Practice</h3>
+      <div class="sub">Headcount distribution (238 total)</div>
+      <div class="chart-wrap" style="height:145px;"><canvas id="benchByPractice"></canvas></div>
+    </div>
+    <div class="neo chart-card">
+      <h3>Bench Aging Snapshot</h3>
+      <div class="sub">Resources by days on bench</div>
+      <div class="chart-wrap" style="height:145px;"><canvas id="agingSnap"></canvas></div>
+    </div>
+    <div class="neo chart-card">
+      <h3>Bench Status Breakdown</h3>
+      <div class="sub">Current status of all 238 resources</div>
+      <div style="height:145px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:115px;height:115px;position:relative;">
+          <canvas id="statusBreak"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+            <div style="font-size:18px;font-weight:800;color:var(--text-primary);">238</div>
+            <div style="font-size:9px;color:var(--text-muted);">Total</div>
+          </div>
+        </div>
+        <div style="margin-left:12px;">
+          <div style="margin-bottom:5px;"><div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#84d8b8;"></div><span style="font-size:10px;color:var(--text-secondary);">Available</span></div><div style="font-size:13px;font-weight:800;color:#2e7d6e;">133</div></div>
+          <div style="margin-bottom:5px;"><div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#d4a8e8;"></div><span style="font-size:10px;color:var(--text-secondary);">IFB Pipeline</span></div><div style="font-size:13px;font-weight:800;color:#6b3fa0;">28</div></div>
+          <div style="margin-bottom:5px;"><div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#f8c09a;"></div><span style="font-size:10px;color:var(--text-secondary);">Proposed/Upskill</span></div><div style="font-size:13px;font-weight:800;color:#b5641a;">36</div></div>
+          <div><div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;border-radius:2px;background:#f09db0;"></div><span style="font-size:10px;color:var(--text-secondary);">Other/Internal</span></div><div style="font-size:13px;font-weight:800;color:#b5364a;">41</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCE FLOW -->
+  <div class="neo chart-card mb-28">
+    <h3>Resource Source Flow</h3>
+    <div class="sub">Resource distribution by source — 238 total headcount · 1 Sep 2026</div>
+
+    <!-- ── DEPLOYMENT TRACK ── -->
+    <div style="font-size:9px;font-weight:700;letter-spacing:.6px;color:var(--text-muted);text-transform:uppercase;margin:10px 0 6px 4px;">🟢 Deployment Track — where each of the 238 bench resources sits today</div>
+    <div style="display:flex;align-items:center;position:relative;padding:4px 0 4px;">
+      <!-- connector -->
+      <div style="position:absolute;top:37px;left:calc(6% + 30px);right:calc(6% + 30px);height:3px;background:linear-gradient(90deg,var(--p-sky),var(--p-lavender),var(--p-peach),var(--p-cream),var(--p-mint));border-radius:2px;opacity:.5;z-index:0;"></div>
+
+      <!-- New Joiner -->
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;z-index:1;">
+        <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,rgba(135,196,239,.38),var(--bg));box-shadow:4px 4px 11px var(--shadow-dark),-4px -4px 11px var(--shadow-light);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:17px;font-weight:800;color:#2a78aa;line-height:1;">2</div>
+          <div style="font-size:7.5px;color:var(--text-muted);font-weight:600;margin-top:1px;">Entry</div>
+        </div>
+        <div style="margin-top:7px;text-align:center;">
+          <div style="font-size:10.5px;font-weight:700;color:var(--text-primary);">New Joiner</div>
+          <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">1% of bench</div>
+        </div>
+      </div>
+
+      <div style="flex:0 0 auto;z-index:1;margin-bottom:26px;"><svg width="16" height="12" viewBox="0 0 18 14" fill="none"><path d="M0 7h14M10 2l6 5-6 5" stroke="#b0b8d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- Available -->
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;z-index:1;">
+        <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,rgba(197,184,240,.4),var(--bg));box-shadow:4px 4px 11px var(--shadow-dark),-4px -4px 11px var(--shadow-light);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:17px;font-weight:800;color:#5c6bc0;line-height:1;">133</div>
+          <div style="font-size:7.5px;color:var(--text-muted);font-weight:600;margin-top:1px;">Ready</div>
+        </div>
+        <div style="margin-top:7px;text-align:center;">
+          <div style="font-size:10.5px;font-weight:700;color:var(--text-primary);">Available</div>
+          <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">56% of bench</div>
+        </div>
+      </div>
+
+      <div style="flex:0 0 auto;z-index:1;margin-bottom:26px;"><svg width="16" height="12" viewBox="0 0 18 14" fill="none"><path d="M0 7h14M10 2l6 5-6 5" stroke="#b0b8d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- Upskilling / Pending -->
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;z-index:1;">
+        <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,rgba(248,192,154,.38),var(--bg));box-shadow:4px 4px 11px var(--shadow-dark),-4px -4px 11px var(--shadow-light);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:17px;font-weight:800;color:#b5641a;line-height:1;">40</div>
+          <div style="font-size:7.5px;color:var(--text-muted);font-weight:600;margin-top:1px;">Building</div>
+        </div>
+        <div style="margin-top:7px;text-align:center;">
+          <div style="font-size:10.5px;font-weight:700;color:var(--text-primary);">Upskilling / Pending</div>
+          <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">17% of bench</div>
+        </div>
+      </div>
+
+      <div style="flex:0 0 auto;z-index:1;margin-bottom:26px;"><svg width="16" height="12" viewBox="0 0 18 14" fill="none"><path d="M0 7h14M10 2l6 5-6 5" stroke="#b0b8d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- Proposed -->
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;z-index:1;">
+        <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,rgba(248,230,168,.45),var(--bg));box-shadow:4px 4px 11px var(--shadow-dark),-4px -4px 11px var(--shadow-light);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:17px;font-weight:800;color:#8a6a00;line-height:1;">16</div>
+          <div style="font-size:7.5px;color:var(--text-muted);font-weight:600;margin-top:1px;">Active</div>
+        </div>
+        <div style="margin-top:7px;text-align:center;">
+          <div style="font-size:10.5px;font-weight:700;color:var(--text-primary);">Proposed</div>
+          <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">7% of bench</div>
+        </div>
+      </div>
+
+      <div style="flex:0 0 auto;z-index:1;margin-bottom:26px;"><svg width="16" height="12" viewBox="0 0 18 14" fill="none"><path d="M0 7h14M10 2l6 5-6 5" stroke="#b0b8d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+      <!-- IFB Pipeline -->
+      <div style="display:flex;flex-direction:column;align-items:center;flex:1;z-index:1;">
+        <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(145deg,rgba(132,216,184,.45),rgba(100,196,164,.25));box-shadow:inset 2px 2px 6px rgba(80,160,120,.25),4px 4px 11px var(--shadow-dark),-4px -4px 11px var(--shadow-light);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:17px;font-weight:800;color:#1a6040;line-height:1;">28</div>
+          <div style="font-size:7.5px;color:#2e7d6e;font-weight:600;margin-top:1px;">Selecting</div>
+        </div>
+        <div style="margin-top:7px;text-align:center;">
+          <div style="font-size:10.5px;font-weight:700;color:var(--text-primary);">IFB Pipeline</div>
+          <div style="font-size:8px;color:#2e7d6e;margin-top:1px;font-weight:600;">12% of bench</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── SUPPORT POOL ── -->
+    <div style="font-size:9px;font-weight:700;letter-spacing:.6px;color:var(--text-muted);text-transform:uppercase;margin:12px 0 7px 4px;">🔴 Non-Deployable Pool</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+      <!-- Internal / Extended -->
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);background:linear-gradient(145deg,rgba(168,212,168,.16),var(--bg));">
+        <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(145deg,rgba(168,212,168,.4),rgba(138,192,138,.2));box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:16px;font-weight:800;color:#2e6040;line-height:1;">14</div>
+          <div style="font-size:7px;color:var(--text-muted);font-weight:600;margin-top:1px;">100% ND</div>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text-primary);">Internal / Extended</div>
+          <div style="font-size:8.5px;color:var(--text-muted);margin-top:2px;">Internal assignment, long leave, resignation &amp; extensions</div>
+          <div style="margin-top:6px;height:5px;border-radius:3px;box-shadow:inset 2px 2px 4px var(--shadow-dark),inset -2px -2px 4px var(--shadow-light);overflow:hidden;"><div style="height:100%;width:100%;background:linear-gradient(90deg,var(--p-sage),var(--p-teal));border-radius:3px;"></div></div>
+        </div>
+      </div>
+
+      <!-- Billed / Delivery Support -->
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);background:linear-gradient(145deg,rgba(128,206,206,.16),var(--bg));">
+        <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(145deg,rgba(128,206,206,.4),rgba(98,176,176,.2));box-shadow:3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light);flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="font-size:16px;font-weight:800;color:#1a5858;line-height:1;">5</div>
+          <div style="font-size:7px;color:var(--text-muted);font-weight:600;margin-top:1px;">100% ND</div>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text-primary);">Billed / Delivery Support</div>
+          <div style="font-size:8.5px;color:var(--text-muted);margin-top:2px;">Billed engagements &amp; delivery overhead roles</div>
+          <div style="margin-top:6px;height:5px;border-radius:3px;box-shadow:inset 2px 2px 4px var(--shadow-dark),inset -2px -2px 4px var(--shadow-light);overflow:hidden;"><div style="height:100%;width:36%;background:linear-gradient(90deg,var(--p-teal),var(--p-sky));border-radius:3px;"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 2 — AGING ANALYSIS ═══ -->
+<div class="tab-section" id="tab-aging">
+  <div class="tab-header-row">
+    <div class="section-label">Aging Analysis — Detailed Breakdown</div>
+<div class="pod-filter-bar neo">
+  <label>🎯 POD HRBP</label>
+  <select class="pod-select" id="podHrbpFilter" onchange="applyPodFilter('hrbp',this.value)">
+    <option value="">All HRBPs</option>
+    <option value="HRBP-01">HRBP-01</option><option value="HRBP-02">HRBP-02</option><option value="HRBP-03">HRBP-03</option><option value="HRBP-04">HRBP-04</option><option value="HRBP-05">HRBP-05</option><option value="HRBP-06">HRBP-06</option><option value="HRBP-07">HRBP-07</option><option value="HRBP-08">HRBP-08</option><option value="HRBP-09">HRBP-09</option><option value="HRBP-10">HRBP-10</option>
+  </select>
+  <label style="margin-left:6px;">👤 POD Leader</label>
+  <select class="pod-select" id="podLeaderFilter" onchange="applyPodFilter('leader',this.value)">
+    <option value="">All Leaders</option>
+    <option value="Lead-01">Lead-01</option><option value="Lead-02">Lead-02</option><option value="Lead-03">Lead-03</option><option value="Lead-04">Lead-04</option><option value="Lead-05">Lead-05</option><option value="Lead-06">Lead-06</option><option value="Lead-07">Lead-07</option><option value="Lead-08">Lead-08</option><option value="Lead-09">Lead-09</option><option value="Lead-10">Lead-10</option><option value="Lead-11">Lead-11</option><option value="Lead-12">Lead-12</option><option value="Lead-13">Lead-13</option><option value="Lead-14">Lead-14</option><option value="Lead-15">Lead-15</option><option value="Lead-16">Lead-16</option><option value="Lead-17">Lead-17</option><option value="Lead-18">Lead-18</option><option value="Lead-19">Lead-19</option><option value="Lead-20">Lead-20</option><option value="Lead-21">Lead-21</option><option value="Lead-22">Lead-22</option><option value="Lead-23">Lead-23</option><option value="Lead-24">Lead-24</option><option value="Lead-25">Lead-25</option><option value="Lead-26">Lead-26</option><option value="Lead-27">Lead-27</option><option value="Lead-28">Lead-28</option><option value="Lead-29">Lead-29</option><option value="Lead-30">Lead-30</option><option value="Lead-31">Lead-31</option><option value="Lead-32">Lead-32</option><option value="Lead-33">Lead-33</option><option value="Lead-34">Lead-34</option><option value="Lead-35">Lead-35</option><option value="Lead-36">Lead-36</option><option value="Lead-37">Lead-37</option><option value="Lead-38">Lead-38</option><option value="Lead-39">Lead-39</option><option value="Lead-40">Lead-40</option><option value="Lead-41">Lead-41</option><option value="Lead-42">Lead-42</option><option value="Lead-43">Lead-43</option><option value="Lead-44">Lead-44</option><option value="Lead-45">Lead-45</option><option value="Lead-46">Lead-46</option><option value="Lead-47">Lead-47</option><option value="Lead-48">Lead-48</option><option value="Lead-49">Lead-49</option><option value="Lead-50">Lead-50</option><option value="Lead-51">Lead-51</option><option value="Lead-52">Lead-52</option><option value="Lead-53">Lead-53</option><option value="Lead-54">Lead-54</option>
+  </select>
+  <button class="pod-clear-btn" onclick="clearPodFilter()">✕ Clear</button>
+  <span id="podFilterCount" style="font-size:10px;color:var(--text-muted);margin-left:auto;"></span>
+</div>
+
+    <button class="dl-btn" onclick="downloadTab('aging')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Excel</button>
+  </div>
+  <div class="grid-2 mb-20">
+    <div class="neo chart-card">
+      <h3>Aging Distribution by Practice</h3>
+      <div class="sub">Stacked bench age buckets per practice</div>
+      <div class="chart-wrap" style="height:280px;"><canvas id="agingByPractice"></canvas></div>
+    </div>
+    <div class="neo chart-card">
+      <h3>Aging Bucket Summary</h3>
+      <div class="sub">All 238 bench resources by age</div>
+      <div style="margin-top:8px;">
+        <div class="aging-row">
+          <span class="aging-label" style="color:#2e7d6e;">🟢 0–15 Days</span>
+          <div class="aging-bar-wrap"><div class="aging-bar" style="width:50%;background:linear-gradient(90deg,#84d8b8,#6ec8a8);">130</div></div>
+          <span class="aging-count" style="color:#2e7d6e;">130</span>
+        </div>
+        <div class="aging-row">
+          <span class="aging-label" style="color:#2a78aa;">🔵 16–30 Days</span>
+          <div class="aging-bar-wrap"><div class="aging-bar" style="width:12%;background:linear-gradient(90deg,#87c4ef,#6ab4e0);">32</div></div>
+          <span class="aging-count" style="color:#2a78aa;">32</span>
+        </div>
+        <div class="aging-row">
+          <span class="aging-label" style="color:#5c6bc0;">🟣 31–45 Days</span>
+          <div class="aging-bar-wrap"><div class="aging-bar" style="width:15%;background:linear-gradient(90deg,#c5b8f0,#a898e0);">28</div></div>
+          <span class="aging-count" style="color:#5c6bc0;">28</span>
+        </div>
+        <div class="aging-row">
+          <span class="aging-label" style="color:#b5641a;">🟡 46–60 Days</span>
+          <div class="aging-bar-wrap"><div class="aging-bar" style="width:5%;background:linear-gradient(90deg,#f8c09a,#f0a878);">12</div></div>
+          <span class="aging-count" style="color:#b5641a;">12</span>
+        </div>
+        <div class="aging-row">
+          <span class="aging-label" style="color:#c04030;">🟠 61–90 Days</span>
+          <div class="aging-bar-wrap"><div class="aging-bar" style="width:9%;background:linear-gradient(90deg,#f4a094,#e88070);">21</div></div>
+          <span class="aging-count" style="color:#c04030;">21</span>
+        </div>
+        <div class="aging-row">
+          <span class="aging-label" style="color:#b5364a;">🔴 91+ Days</span>
+          <div class="aging-bar-wrap"><div class="aging-bar" style="width:9%;background:linear-gradient(90deg,#f09db0,#e08090);">21</div></div>
+          <span class="aging-count" style="color:#b5364a;">21</span>
+        </div>
+        <div style="margin-top:18px;padding:14px 16px;border-radius:14px;" class="neo-inset">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--text-secondary);">Total Bench</span>
+            <span style="font-size:14px;font-weight:800;color:var(--primary-dark);">238</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--text-secondary);">Critical Aged (&gt;91d)</span>
+            <span style="font-size:14px;font-weight:800;color:#b5364a;">23 <span style="font-size:10px;font-weight:500;color:var(--text-muted);">(8.9%)</span></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;color:var(--text-secondary);">Watch Zone (61–90d)</span>
+            <span style="font-size:14px;font-weight:800;color:#c04030;">23 <span style="font-size:10px;font-weight:500;color:var(--text-muted);">(8.9%)</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="neo chart-card mb-28">
+    <h3>Aging Heatmap — Practice × Bucket</h3>
+    <div class="sub">Bench aging intensity across all practices (1 Sep 2026)</div>
+    <div style="margin-top:16px;overflow-x:auto;">
+      <table class="neo-table">
+        <thead><tr>
+          <th>Practice</th><th>Total</th>
+          <th style="color:#2e7d6e;">0–15d</th>
+          <th style="color:#2a78aa;">16–30d</th>
+          <th style="color:#5c6bc0;">31–45d</th>
+          <th style="color:#b5641a;">46–60d</th>
+          <th style="color:#c04030;">61–90d</th>
+          <th style="color:#b5364a;">91+ d</th>
+          <th>Risk</th>
+        </tr></thead>
+        <tbody id="agingTableBody">
+          <tr><td>⚙️ Big Data &amp; EDW</td><td><strong>169</strong></td><td>79</td><td>21</td><td>27</td><td>10</td><td>15</td><td>17</td><td><span class="pill pill-red">High</span></td></tr>
+          <tr><td>🔬 Data Science</td><td><strong>37</strong></td><td>20</td><td>7</td><td>3</td><td>1</td><td>4</td><td>2</td><td><span class="pill pill-yellow">Medium</span></td></tr>
+          <tr><td>🌐 App Development</td><td><strong>14</strong></td><td>11</td><td>1</td><td>2</td><td>0</td><td>0</td><td>0</td><td><span class="pill pill-green">Low</span></td></tr>
+          <tr><td>☁️ DevOps &amp; App Mod</td><td><strong>12</strong></td><td>4</td><td>3</td><td>2</td><td>1</td><td>1</td><td>1</td><td><span class="pill pill-yellow">Medium</span></td></tr>
+          <tr><td>🤖 MWP &amp; Chatbot</td><td><strong>11</strong></td><td>7</td><td>0</td><td>2</td><td>0</td><td>1</td><td>1</td><td><span class="pill pill-yellow">Medium</span></td></tr>
+          <tr><td>🏗️ PET</td><td><strong>11</strong></td><td>7</td><td>0</td><td>1</td><td>0</td><td>2</td><td>1</td><td><span class="pill pill-yellow">Medium</span></td></tr>
+          <tr><td>🔷 ERP Modernization</td><td><strong>2</strong></td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td><td><span class="pill pill-yellow">Medium</span></td></tr>
+          <tr><td>🧪 Quality Analyst</td><td><strong>2</strong></td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td><td><span class="pill pill-green">Low</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 3 — SKILLS ═══ -->
+<div class="tab-section" id="tab-skills">
+  <div class="tab-header-row">
+    <div class="section-label">Skills Available on Bench</div>
+<div class="pod-filter-bar neo">
+  <label>🎯 POD HRBP</label>
+  <select class="pod-select" id="podHrbpFilter" onchange="applyPodFilter('hrbp',this.value)">
+    <option value="">All HRBPs</option>
+    <option value="HRBP-01">HRBP-01</option><option value="HRBP-02">HRBP-02</option><option value="HRBP-03">HRBP-03</option><option value="HRBP-04">HRBP-04</option><option value="HRBP-05">HRBP-05</option><option value="HRBP-06">HRBP-06</option><option value="HRBP-07">HRBP-07</option><option value="HRBP-08">HRBP-08</option><option value="HRBP-09">HRBP-09</option><option value="HRBP-10">HRBP-10</option>
+  </select>
+  <label style="margin-left:6px;">👤 POD Leader</label>
+  <select class="pod-select" id="podLeaderFilter" onchange="applyPodFilter('leader',this.value)">
+    <option value="">All Leaders</option>
+    <option value="Lead-01">Lead-01</option><option value="Lead-02">Lead-02</option><option value="Lead-03">Lead-03</option><option value="Lead-04">Lead-04</option><option value="Lead-05">Lead-05</option><option value="Lead-06">Lead-06</option><option value="Lead-07">Lead-07</option><option value="Lead-08">Lead-08</option><option value="Lead-09">Lead-09</option><option value="Lead-10">Lead-10</option><option value="Lead-11">Lead-11</option><option value="Lead-12">Lead-12</option><option value="Lead-13">Lead-13</option><option value="Lead-14">Lead-14</option><option value="Lead-15">Lead-15</option><option value="Lead-16">Lead-16</option><option value="Lead-17">Lead-17</option><option value="Lead-18">Lead-18</option><option value="Lead-19">Lead-19</option><option value="Lead-20">Lead-20</option><option value="Lead-21">Lead-21</option><option value="Lead-22">Lead-22</option><option value="Lead-23">Lead-23</option><option value="Lead-24">Lead-24</option><option value="Lead-25">Lead-25</option><option value="Lead-26">Lead-26</option><option value="Lead-27">Lead-27</option><option value="Lead-28">Lead-28</option><option value="Lead-29">Lead-29</option><option value="Lead-30">Lead-30</option><option value="Lead-31">Lead-31</option><option value="Lead-32">Lead-32</option><option value="Lead-33">Lead-33</option><option value="Lead-34">Lead-34</option><option value="Lead-35">Lead-35</option><option value="Lead-36">Lead-36</option><option value="Lead-37">Lead-37</option><option value="Lead-38">Lead-38</option><option value="Lead-39">Lead-39</option><option value="Lead-40">Lead-40</option><option value="Lead-41">Lead-41</option><option value="Lead-42">Lead-42</option><option value="Lead-43">Lead-43</option><option value="Lead-44">Lead-44</option><option value="Lead-45">Lead-45</option><option value="Lead-46">Lead-46</option><option value="Lead-47">Lead-47</option><option value="Lead-48">Lead-48</option><option value="Lead-49">Lead-49</option><option value="Lead-50">Lead-50</option><option value="Lead-51">Lead-51</option><option value="Lead-52">Lead-52</option><option value="Lead-53">Lead-53</option><option value="Lead-54">Lead-54</option>
+  </select>
+  <button class="pod-clear-btn" onclick="clearPodFilter()">✕ Clear</button>
+  <span id="podFilterCount" style="font-size:10px;color:var(--text-muted);margin-left:auto;"></span>
+</div>
+
+    <button class="dl-btn" onclick="downloadTab('skills')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Excel</button>
+  </div>
+
+  <!-- Row 1: chart + table side by side, compact -->
+  <div class="grid-2 mb-20">
+    <div class="neo chart-card">
+      <h3>Top Primary Skills on Bench</h3>
+      <div class="sub">Resources by primary skill tag</div>
+      <div class="chart-wrap" style="height:170px;"><canvas id="skillsBar"></canvas></div>
+    </div>
+    <div class="neo chart-card">
+      <h3>Skill × Level Distribution</h3>
+      <div class="sub">Seniority spread across top skills</div>
+      <div style="margin-top:8px;overflow-x:auto;">
+        <table class="neo-table" style="font-size:10.5px;">
+          <thead><tr><th>Skill</th><th>Eng</th><th>Sr Eng</th><th>Cons.</th><th>Sr+</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><td>Big Data &amp; EDW</td><td>54</td><td>10</td><td>3</td><td>1</td><td><strong>68</strong></td></tr>
+            <tr><td>Data Science</td><td>31</td><td>4</td><td>2</td><td>1</td><td><strong>28</strong></td></tr>
+            <tr><td>Databricks</td><td>19</td><td>4</td><td>1</td><td>0</td><td><strong>24</strong></td></tr>
+            <tr><td>Power Apps</td><td>11</td><td>1</td><td>1</td><td>0</td><td><strong>13</strong></td></tr>
+            <tr><td>DevOps</td><td>11</td><td>1</td><td>1</td><td>0</td><td><strong>13</strong></td></tr>
+            <tr><td>Power BI</td><td>9</td><td>2</td><td>1</td><td>0</td><td><strong>12</strong></td></tr>
+            <tr><td>SAP Technical</td><td>10</td><td>1</td><td>0</td><td>0</td><td><strong>11</strong></td></tr>
+            <tr><td>Full-Stack / FE</td><td>8</td><td>0</td><td>1</td><td>0</td><td><strong>9</strong></td></tr>
+            <tr><td>Business Intel.</td><td>7</td><td>1</td><td>0</td><td>0</td><td><strong>8</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Quick Skill Availability — 4-col clickable cards -->
+  <div class="neo chart-card mb-28">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div>
+        <h3 style="margin-bottom:2px;">Quick Skill Availability Reference</h3>
+        <div class="sub" style="margin-bottom:0;">Click any card to download resource-wise Excel for that skill</div>
+      </div>
+      <div style="font-size:9px;color:var(--text-muted);background:rgba(197,184,240,.18);padding:4px 10px;border-radius:8px;box-shadow:2px 2px 5px var(--shadow-dark),-2px -2px 5px var(--shadow-light);">⬇️ Click card = Download</div>
+    </div>
+    <div id="skillChipsGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Big Data','Big Data & EDW')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(135,196,239,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">⚙️</div>
+        <div style="font-size:20px;font-weight:800;color:#2a78aa;line-height:1.1;">68</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Big Data &amp; EDW</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Data Science','Data Science')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(212,168,232,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">🔬</div>
+        <div style="font-size:20px;font-weight:800;color:#6b3fa0;line-height:1.1;">28</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Data Science</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Databricks','Databricks')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(197,184,240,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">🔴</div>
+        <div style="font-size:20px;font-weight:800;color:#5c6bc0;line-height:1.1;">24</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Databricks</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Power Apps','Power Apps')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(248,192,154,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">⚡</div>
+        <div style="font-size:20px;font-weight:800;color:#b5641a;line-height:1.1;">13</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Power Apps</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('DevOps','DevOps')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(128,206,206,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">☁️</div>
+        <div style="font-size:20px;font-weight:800;color:#1a6e5a;line-height:1.1;">13</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">DevOps</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Power BI','Power BI')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(240,157,176,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">📊</div>
+        <div style="font-size:20px;font-weight:800;color:#b5364a;line-height:1.1;">12</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Power BI</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('SAP','SAP Technical')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(132,216,184,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">🔷</div>
+        <div style="font-size:20px;font-weight:800;color:#2e7060;line-height:1.1;">11</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">SAP Technical</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Full|FrontEnd|Frontend','Full-Stack / FrontEnd')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(244,160,148,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">🌐</div>
+        <div style="font-size:20px;font-weight:800;color:#c04030;line-height:1.1;">9</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Full-Stack / FE</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Business Intelligence','Business Intelligence')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(248,230,168,.22),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">📈</div>
+        <div style="font-size:20px;font-weight:800;color:#8a6a00;line-height:1.1;">8</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Business Intel.</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('sql|SQL|ETL','SQL / ETL')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(135,196,239,.18),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">🐍</div>
+        <div style="font-size:20px;font-weight:800;color:#2a78aa;line-height:1.1;">6</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">SQL / ETL</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('Cloud','Cloud Infra')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(197,184,240,.18),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">🛡️</div>
+        <div style="font-size:20px;font-weight:800;color:#5c6bc0;line-height:1.1;">6</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">Cloud Infra</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+      <div class="skill-chip" onclick="downloadSkillDetail('App Development','App Development')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(168,212,168,.18),var(--bg));transition:box-shadow .2s;" onmouseenter="this.style.boxShadow='inset 3px 3px 8px var(--shadow-dark),inset -3px -3px 8px var(--shadow-light)'" onmouseleave="this.style.boxShadow='3px 3px 8px var(--shadow-dark),-3px -3px 8px var(--shadow-light)'">
+        <div style="font-size:16px;">📱</div>
+        <div style="font-size:20px;font-weight:800;color:#1a6e5a;line-height:1.1;">6</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">App Development</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 4 — IFB PIPELINE ═══ -->
+<div class="tab-section" id="tab-pipeline">
+  <div class="tab-header-row">
+    <div class="section-label">IFB Pipeline — Resources in Interview / Deployment Process</div>
+<div class="pod-filter-bar neo">
+  <label>🎯 POD HRBP</label>
+  <select class="pod-select" id="podHrbpFilter" onchange="applyPodFilter('hrbp',this.value)">
+    <option value="">All HRBPs</option>
+    <option value="HRBP-01">HRBP-01</option><option value="HRBP-02">HRBP-02</option><option value="HRBP-03">HRBP-03</option><option value="HRBP-04">HRBP-04</option><option value="HRBP-05">HRBP-05</option><option value="HRBP-06">HRBP-06</option><option value="HRBP-07">HRBP-07</option><option value="HRBP-08">HRBP-08</option><option value="HRBP-09">HRBP-09</option><option value="HRBP-10">HRBP-10</option>
+  </select>
+  <label style="margin-left:6px;">👤 POD Leader</label>
+  <select class="pod-select" id="podLeaderFilter" onchange="applyPodFilter('leader',this.value)">
+    <option value="">All Leaders</option>
+    <option value="Lead-01">Lead-01</option><option value="Lead-02">Lead-02</option><option value="Lead-03">Lead-03</option><option value="Lead-04">Lead-04</option><option value="Lead-05">Lead-05</option><option value="Lead-06">Lead-06</option><option value="Lead-07">Lead-07</option><option value="Lead-08">Lead-08</option><option value="Lead-09">Lead-09</option><option value="Lead-10">Lead-10</option><option value="Lead-11">Lead-11</option><option value="Lead-12">Lead-12</option><option value="Lead-13">Lead-13</option><option value="Lead-14">Lead-14</option><option value="Lead-15">Lead-15</option><option value="Lead-16">Lead-16</option><option value="Lead-17">Lead-17</option><option value="Lead-18">Lead-18</option><option value="Lead-19">Lead-19</option><option value="Lead-20">Lead-20</option><option value="Lead-21">Lead-21</option><option value="Lead-22">Lead-22</option><option value="Lead-23">Lead-23</option><option value="Lead-24">Lead-24</option><option value="Lead-25">Lead-25</option><option value="Lead-26">Lead-26</option><option value="Lead-27">Lead-27</option><option value="Lead-28">Lead-28</option><option value="Lead-29">Lead-29</option><option value="Lead-30">Lead-30</option><option value="Lead-31">Lead-31</option><option value="Lead-32">Lead-32</option><option value="Lead-33">Lead-33</option><option value="Lead-34">Lead-34</option><option value="Lead-35">Lead-35</option><option value="Lead-36">Lead-36</option><option value="Lead-37">Lead-37</option><option value="Lead-38">Lead-38</option><option value="Lead-39">Lead-39</option><option value="Lead-40">Lead-40</option><option value="Lead-41">Lead-41</option><option value="Lead-42">Lead-42</option><option value="Lead-43">Lead-43</option><option value="Lead-44">Lead-44</option><option value="Lead-45">Lead-45</option><option value="Lead-46">Lead-46</option><option value="Lead-47">Lead-47</option><option value="Lead-48">Lead-48</option><option value="Lead-49">Lead-49</option><option value="Lead-50">Lead-50</option><option value="Lead-51">Lead-51</option><option value="Lead-52">Lead-52</option><option value="Lead-53">Lead-53</option><option value="Lead-54">Lead-54</option>
+  </select>
+  <button class="pod-clear-btn" onclick="clearPodFilter()">✕ Clear</button>
+  <span id="podFilterCount" style="font-size:10px;color:var(--text-muted);margin-left:auto;"></span>
+</div>
+
+    <button class="dl-btn" onclick="downloadTab('pipeline')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Excel</button>
+  </div>
+  <div class="grid-4 mb-20">
+    <div class="neo kpi-card" style="padding:16px 20px;background:linear-gradient(145deg,rgba(212,168,232,.15),var(--bg));">
+      <div style="font-size:24px;font-weight:800;color:#6b3fa0;">27</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">IFB-Selected</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Shortlisted by client</div>
+    </div>
+    <div class="neo kpi-card" style="padding:16px 20px;background:linear-gradient(145deg,rgba(248,192,154,.15),var(--bg));">
+      <div style="font-size:24px;font-weight:800;color:#b5641a;">10</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">IFB-Reserved</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Reserved for deployment</div>
+    </div>
+    <div class="neo kpi-card" style="padding:16px 20px;background:linear-gradient(145deg,rgba(135,196,239,.15),var(--bg));">
+      <div style="font-size:24px;font-weight:800;color:#2a78aa;">5</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Pipeline Planned</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Opportunities lined up</div>
+    </div>
+    <div class="neo kpi-card" style="padding:16px 20px;background:linear-gradient(145deg,rgba(160,174,192,.1),var(--bg));">
+      <div style="font-size:24px;font-weight:800;color:#4a5568;">1</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">IFB-Shadow</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Shadowing placement</div>
+    </div>
+  </div>
+  <div class="grid-2 mb-20">
+    <div class="neo chart-card">
+      <h3>IFB-Selected (27) — Top Candidates</h3>
+      <div class="sub">Shortlisted by clients, awaiting final deployment</div>
+      <div id="ifbSelectedList" style="margin-top:10px;max-height:380px;overflow-y:auto;"></div>
+    </div>
+    <div class="neo chart-card">
+      <h3>IFB-Reserved + Pipeline Planned (15)</h3>
+      <div class="sub">Reserved or planned for upcoming engagements</div>
+      <div id="ifbReservedList" style="margin-top:10px;max-height:380px;overflow-y:auto;"></div>
+    </div>
+  </div>
+  <div class="neo chart-card mb-28">
+    <h3>IFB Pipeline by Practice</h3>
+    <div class="sub">Distribution of pipeline resources across practices</div>
+    <div class="chart-wrap" style="height:200px;"><canvas id="pipelineChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ═══ TAB 5 — REGISTER ═══ -->
+<div class="tab-section" id="tab-register">
+  <div class="tab-header-row">
+    <div class="section-label">Bench Register — All 238 Resources (1 Sep 2026)</div>
+<div class="pod-filter-bar neo">
+  <label>🎯 POD HRBP</label>
+  <select class="pod-select" id="podHrbpFilter" onchange="applyPodFilter('hrbp',this.value)">
+    <option value="">All HRBPs</option>
+    <option value="HRBP-01">HRBP-01</option><option value="HRBP-02">HRBP-02</option><option value="HRBP-03">HRBP-03</option><option value="HRBP-04">HRBP-04</option><option value="HRBP-05">HRBP-05</option><option value="HRBP-06">HRBP-06</option><option value="HRBP-07">HRBP-07</option><option value="HRBP-08">HRBP-08</option><option value="HRBP-09">HRBP-09</option><option value="HRBP-10">HRBP-10</option>
+  </select>
+  <label style="margin-left:6px;">👤 POD Leader</label>
+  <select class="pod-select" id="podLeaderFilter" onchange="applyPodFilter('leader',this.value)">
+    <option value="">All Leaders</option>
+    <option value="Lead-01">Lead-01</option><option value="Lead-02">Lead-02</option><option value="Lead-03">Lead-03</option><option value="Lead-04">Lead-04</option><option value="Lead-05">Lead-05</option><option value="Lead-06">Lead-06</option><option value="Lead-07">Lead-07</option><option value="Lead-08">Lead-08</option><option value="Lead-09">Lead-09</option><option value="Lead-10">Lead-10</option><option value="Lead-11">Lead-11</option><option value="Lead-12">Lead-12</option><option value="Lead-13">Lead-13</option><option value="Lead-14">Lead-14</option><option value="Lead-15">Lead-15</option><option value="Lead-16">Lead-16</option><option value="Lead-17">Lead-17</option><option value="Lead-18">Lead-18</option><option value="Lead-19">Lead-19</option><option value="Lead-20">Lead-20</option><option value="Lead-21">Lead-21</option><option value="Lead-22">Lead-22</option><option value="Lead-23">Lead-23</option><option value="Lead-24">Lead-24</option><option value="Lead-25">Lead-25</option><option value="Lead-26">Lead-26</option><option value="Lead-27">Lead-27</option><option value="Lead-28">Lead-28</option><option value="Lead-29">Lead-29</option><option value="Lead-30">Lead-30</option><option value="Lead-31">Lead-31</option><option value="Lead-32">Lead-32</option><option value="Lead-33">Lead-33</option><option value="Lead-34">Lead-34</option><option value="Lead-35">Lead-35</option><option value="Lead-36">Lead-36</option><option value="Lead-37">Lead-37</option><option value="Lead-38">Lead-38</option><option value="Lead-39">Lead-39</option><option value="Lead-40">Lead-40</option><option value="Lead-41">Lead-41</option><option value="Lead-42">Lead-42</option><option value="Lead-43">Lead-43</option><option value="Lead-44">Lead-44</option><option value="Lead-45">Lead-45</option><option value="Lead-46">Lead-46</option><option value="Lead-47">Lead-47</option><option value="Lead-48">Lead-48</option><option value="Lead-49">Lead-49</option><option value="Lead-50">Lead-50</option><option value="Lead-51">Lead-51</option><option value="Lead-52">Lead-52</option><option value="Lead-53">Lead-53</option><option value="Lead-54">Lead-54</option>
+  </select>
+  <button class="pod-clear-btn" onclick="clearPodFilter()">✕ Clear</button>
+  <span id="podFilterCount" style="font-size:10px;color:var(--text-muted);margin-left:auto;"></span>
+</div>
+
+    <button class="dl-btn" onclick="downloadTab('register')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Excel</button>
+  </div>
+  <div class="search-box">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="registerSearch" placeholder="Search by name, skill, practice, location, designation…" oninput="filterRegister()">
+  </div>
+  <div class="filter-strip" id="filterStrip">
+    <button class="filter-chip active" onclick="setFilter('all',this)">All (238)</button>
+    <button class="filter-chip" onclick="setFilter('critical91',this)">🔴 91+ Days (23)</button>
+    <button class="filter-chip" onclick="setFilter('watch',this)">🟠 61–90 Days (23)</button>
+    <button class="filter-chip" onclick="setFilter('available',this)">🟢 Available (135)</button>
+    <button class="filter-chip" onclick="setFilter('ifb',this)">🎯 IFB Pipeline (38)</button>
+    <button class="filter-chip" onclick="setFilter('deployable',this)">✅ Deployable (194)</button>
+    <button class="filter-chip" onclick="setFilter('nondeployable',this)">🚫 Non Deployable (64)</button>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;" id="regCount">Showing 238 resources</div>
+  <div class="neo" style="padding:0 0 8px;overflow-x:auto;">
+    <table class="neo-table" id="registerTable">
+      <thead><tr>
+        <th>#</th><th>Name</th><th>Designation</th><th>Primary Skill</th>
+        <th>Practice</th><th>Location</th><th>Days on Bench</th><th>Exp</th><th>Deployable</th><th>RMG Status</th>
+      </tr></thead>
+      <tbody id="registerBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ TAB 6 — LOCATION & EXP ═══ -->
+<div class="tab-section" id="tab-location">
+  <div class="tab-header-row">
+    <div class="section-label">Location &amp; Experience Analytics</div>
+<div class="pod-filter-bar neo">
+  <label>🎯 POD HRBP</label>
+  <select class="pod-select" id="podHrbpFilter" onchange="applyPodFilter('hrbp',this.value)">
+    <option value="">All HRBPs</option>
+    <option value="HRBP-01">HRBP-01</option><option value="HRBP-02">HRBP-02</option><option value="HRBP-03">HRBP-03</option><option value="HRBP-04">HRBP-04</option><option value="HRBP-05">HRBP-05</option><option value="HRBP-06">HRBP-06</option><option value="HRBP-07">HRBP-07</option><option value="HRBP-08">HRBP-08</option><option value="HRBP-09">HRBP-09</option><option value="HRBP-10">HRBP-10</option>
+  </select>
+  <label style="margin-left:6px;">👤 POD Leader</label>
+  <select class="pod-select" id="podLeaderFilter" onchange="applyPodFilter('leader',this.value)">
+    <option value="">All Leaders</option>
+    <option value="Lead-01">Lead-01</option><option value="Lead-02">Lead-02</option><option value="Lead-03">Lead-03</option><option value="Lead-04">Lead-04</option><option value="Lead-05">Lead-05</option><option value="Lead-06">Lead-06</option><option value="Lead-07">Lead-07</option><option value="Lead-08">Lead-08</option><option value="Lead-09">Lead-09</option><option value="Lead-10">Lead-10</option><option value="Lead-11">Lead-11</option><option value="Lead-12">Lead-12</option><option value="Lead-13">Lead-13</option><option value="Lead-14">Lead-14</option><option value="Lead-15">Lead-15</option><option value="Lead-16">Lead-16</option><option value="Lead-17">Lead-17</option><option value="Lead-18">Lead-18</option><option value="Lead-19">Lead-19</option><option value="Lead-20">Lead-20</option><option value="Lead-21">Lead-21</option><option value="Lead-22">Lead-22</option><option value="Lead-23">Lead-23</option><option value="Lead-24">Lead-24</option><option value="Lead-25">Lead-25</option><option value="Lead-26">Lead-26</option><option value="Lead-27">Lead-27</option><option value="Lead-28">Lead-28</option><option value="Lead-29">Lead-29</option><option value="Lead-30">Lead-30</option><option value="Lead-31">Lead-31</option><option value="Lead-32">Lead-32</option><option value="Lead-33">Lead-33</option><option value="Lead-34">Lead-34</option><option value="Lead-35">Lead-35</option><option value="Lead-36">Lead-36</option><option value="Lead-37">Lead-37</option><option value="Lead-38">Lead-38</option><option value="Lead-39">Lead-39</option><option value="Lead-40">Lead-40</option><option value="Lead-41">Lead-41</option><option value="Lead-42">Lead-42</option><option value="Lead-43">Lead-43</option><option value="Lead-44">Lead-44</option><option value="Lead-45">Lead-45</option><option value="Lead-46">Lead-46</option><option value="Lead-47">Lead-47</option><option value="Lead-48">Lead-48</option><option value="Lead-49">Lead-49</option><option value="Lead-50">Lead-50</option><option value="Lead-51">Lead-51</option><option value="Lead-52">Lead-52</option><option value="Lead-53">Lead-53</option><option value="Lead-54">Lead-54</option>
+  </select>
+  <button class="pod-clear-btn" onclick="clearPodFilter()">✕ Clear</button>
+  <span id="podFilterCount" style="font-size:10px;color:var(--text-muted);margin-left:auto;"></span>
+</div>
+
+    <button class="dl-btn" onclick="downloadTab('location')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Excel</button>
+  </div>
+  <div class="grid-2 mb-20">
+    <div class="neo chart-card">
+      <h3>Bench by Location</h3>
+      <div class="sub">Headcount distribution across offices</div>
+      <div id="locBarsContainer" style="margin-top:16px;">
+                <div class="loc-bar-row"><span class="loc-name">📍 Location A</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:100%;background:linear-gradient(90deg,#9b8fe0,#b8aee8);">159</div></div><span class="loc-count">159</span></div>
+        <div class="loc-bar-row"><span class="loc-name">📍 Location B</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:22%;background:linear-gradient(90deg,#87c4ef,#6ab4e0);">35</div></div><span class="loc-count">35</span></div>
+        <div class="loc-bar-row"><span class="loc-name">📍 Location C</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:19%;background:linear-gradient(90deg,#84d8b8,#6ec8a8);">30</div></div><span class="loc-count">30</span></div>
+        <div class="loc-bar-row"><span class="loc-name">📍 Location D</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:3%;background:linear-gradient(90deg,#f8c09a,#f0a878);">4</div></div><span class="loc-count">4</span></div>
+        <div class="loc-bar-row"><span class="loc-name">📍 Location E</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:3%;background:linear-gradient(90deg,#d4a8e8,#c08eda);">4</div></div><span class="loc-count">4</span></div>
+        <div class="loc-bar-row"><span class="loc-name">📍 Location F</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:3%;background:linear-gradient(90deg,#f09db0,#e88090);">4</div></div><span class="loc-count">4</span></div>
+        <div class="loc-bar-row"><span class="loc-name">📍 Location G</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:1%;background:linear-gradient(90deg,#80cece,#60aeae);">2</div></div><span class="loc-count">2</span></div>
+      </div>
+    </div>
+    <div class="neo chart-card">
+      <h3>Experience Bucket Distribution</h3>
+      <div class="sub">Bench resources by years of experience</div>
+      <div class="chart-wrap" style="height:260px;"><canvas id="expChart"></canvas></div>
+    </div>
+  </div>
+  <div class="grid-2 mb-28">
+    <div class="neo chart-card">
+      <h3>Designation Mix</h3>
+      <div class="sub">Seniority breakdown of all 238 bench resources</div>
+      <div class="chart-wrap" style="height:220px;"><canvas id="designationChart"></canvas></div>
+    </div>
+    <div class="neo chart-card">
+      <h3>Summary Statistics</h3>
+      <div class="sub">Key bench analytics — 1 Sep 2026</div>
+      <div id="locationStatsBox" style="margin-top:12px;">
+        <div class="stat-row"><span class="stat-key">Total Bench</span><span class="stat-val">238</span></div>
+        <div class="stat-row"><span class="stat-key">Deployable</span><span class="stat-val" style="color:#2e7d6e;">194 (75.2%)</span></div>
+        <div class="stat-row"><span class="stat-key">Non Deployable</span><span class="stat-val" style="color:#b5364a;">64 (24.8%)</span></div>
+        <div class="stat-row"><span class="stat-key">Avg Days on Bench</span><span class="stat-val">33 days</span></div>
+        <div class="stat-row"><span class="stat-key">Max Days on Bench</span><span class="stat-val" style="color:#b5364a;">309 days</span></div>
+        <div class="stat-row"><span class="stat-key">Critical (&gt;91 days)</span><span class="stat-val" style="color:#b5364a;">21</span></div>
+        <div class="stat-row"><span class="stat-key">In IFB Pipeline</span><span class="stat-val" style="color:#6b3fa0;">28</span></div>
+        <div class="stat-row"><span class="stat-key">Available (Open)</span><span class="stat-val" style="color:#2e7d6e;">135</span></div>
+        <div class="stat-row"><span class="stat-key">Largest Practice (Bench)</span><span class="stat-val">Big Data &amp; EDW (169)</span></div>
+        <div class="stat-row"><span class="stat-key">Largest Location</span><span class="stat-val">Location A (159)</span></div>
+        <div class="stat-row"><span class="stat-key">Dominant Experience</span><span class="stat-val">0–3 Years (131)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="neo" style="padding:14px 28px;display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+  <div style="font-size:12px;color:var(--text-muted);">🏖️ Bench Management Dashboard · Data &amp; AI Practice</div>
+  <div style="font-size:12px;color:var(--text-muted);">Source: Bench Data from RMG · Live data</div>
+</div>
+
+<script>
+// ─── TAB SWITCHING ────────────────────────────────────────────────────────────
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-nav-btn').forEach(b => b.classList.remove('active'));
+  const target = document.getElementById('tab-' + tabId);
+  if (target) target.classList.add('active');
+  const btn = document.querySelector(`.tab-nav-btn[data-tab="${tabId}"]`);
+  if (btn) btn.classList.add('active');
+  // Resize charts in new tab
+  setTimeout(() => {
+    if (typeof Chart !== 'undefined') {
+      Object.values(Chart.instances).forEach(c => c.resize());
+    }
+  }, 50);
+}
+document.querySelectorAll('.tab-nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ─── DOWNLOAD HELPERS ─────────────────────────────────────────────────────────
+function downloadTab(tab) {
+  const map = {
+    overview: () => {
+      const total = ALL_RESOURCES.length;
+      const deployable = ALL_RESOURCES.filter(r=>r.deployable==='Deployable').length;
+      const nonDeployable = total - deployable;
+      const availableOpen = ALL_RESOURCES.filter(r=>r.status==='available').length;
+      const ifbCount = ALL_RESOURCES.filter(r=>r.status==='ifb').length;
+      const proposed = ALL_RESOURCES.filter(r=>r.rmg==='Proposed').length;
+      const upskilling = ALL_RESOURCES.filter(r=>r.rmg==='Available-Upskilling').length;
+      const critical91 = ALL_RESOURCES.filter(r=>r.age==='91+ days').length;
+      const avgDays = Math.round(ALL_RESOURCES.reduce((s,r)=>s+r.days,0)/total);
+      const rows = [
+        {Metric:'Total on Bench',Value:total},
+        {Metric:'Deployable',Value:deployable},
+        {Metric:'Non Deployable',Value:nonDeployable},
+        {Metric:'Available (Open)',Value:availableOpen},
+        {Metric:'In IFB Pipeline',Value:ifbCount},
+        {Metric:'Proposed',Value:proposed},
+        {Metric:'Upskilling',Value:upskilling},
+        {Metric:'Critical Aged 91+d',Value:critical91},
+        {Metric:'Avg Bench Duration (days)',Value:avgDays},
+      ];
+      exportXlsx(rows, 'Overview_Summary', 'Bench_Overview_1 Sep 2026.xlsx');
+    },
+    aging: () => {
+      const rows = ALL_RESOURCES.map(r=>({EID:r.eid,Name:r.name,Designation:r.level,Skill:r.skill,Practice:r.dept,Location:r.loc,'Days on Bench':r.days,'Age Bucket':r.age,Experience:r.exp,Deployable:r.deployable,'RMG Status':r.rmg}));
+      exportXlsx(rows, 'Aging_Analysis', 'Bench_Aging_1 Sep 2026.xlsx');
+    },
+    skills: () => {
+      const rows = ALL_RESOURCES.map(r=>({EID:r.eid,Name:r.name,Designation:r.level,'Primary Skill':r.skill,Practice:r.dept,Location:r.loc,'Days on Bench':r.days,Experience:r.exp,Deployable:r.deployable}));
+      exportXlsx(rows, 'Skills_on_Bench', 'Bench_Skills_1 Sep 2026.xlsx');
+    },
+    pipeline: () => {
+      const rows = ALL_RESOURCES.filter(r=>r.status==='ifb').map(r=>({EID:r.eid,Name:r.name,Designation:r.level,Skill:r.skill,Practice:r.dept,Location:r.loc,'Days on Bench':r.days,Experience:r.exp,'RMG Status':r.rmg}));
+      exportXlsx(rows, 'IFB_Pipeline', 'Bench_IFB_Pipeline_1 Sep 2026.xlsx');
+    },
+    register: () => {
+      const rows = ALL_RESOURCES.map(r=>({EID:r.eid,Name:r.name,Designation:r.level,'Primary Skill':r.skill,Practice:r.dept,Location:r.loc,'Days on Bench':r.days,'Age Bucket':r.age,Experience:r.exp,Deployable:r.deployable,'RMG Status':r.rmg}));
+      exportXlsx(rows, 'Bench_Register', 'Bench_Register_1 Sep 2026.xlsx');
+    },
+    location: () => {
+      const locs = {};
+      ALL_RESOURCES.forEach(r=>{const l=r.loc.split('-')[0].trim();locs[l]=(locs[l]||0)+1;});
+      const rows = Object.entries(locs).sort((a,b)=>b[1]-a[1]).map(([l,c])=>({Location:l,Count:c}));
+      exportXlsx(rows, 'Location_Distribution', 'Bench_Location_1 Sep 2026.xlsx');
+    }
+  };
+  if (map[tab]) map[tab]();
+}
+function downloadAll() { downloadTab('register'); }
+function exportXlsx(rows, sheetName, filename) {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const cols = Object.keys(rows[0]||{}).map(k=>({wch:Math.max(k.length,...rows.map(r=>String(r[k]||'').length))+2}));
+  ws['!cols'] = cols;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0,31));
+  XLSX.writeFile(wb, filename);
+}
+
+const ALL_RESOURCES = [{"id": 1, "eid": "EMP-0001", "name": "Resource-001", "level": "Senior Software Engineer", "skill": "QA", "dept": "Big Data & EDW", "loc": "Location B", "days": 309, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "08-10 Y", "hrbp": "HRBP-02", "leader": "Lead-37"}, {"id": 2, "eid": "EMP-0002", "name": "Resource-002", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 292, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "06-08 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 3, "eid": "EMP-0003", "name": "Resource-003", "level": "Senior Manager", "skill": "", "dept": "Big Data & EDW", "loc": "Location B", "days": 217, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "15+ Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 4, "eid": "EMP-0004", "name": "Resource-004", "level": "Senior Consultant", "skill": "Backend", "dept": "MWP & Chatbot", "loc": "Location A", "days": 203, "age": "91+ days", "deployable": "Non Deployable", "rmg": "Internal - NBNC", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-31"}, {"id": 5, "eid": "EMP-0005", "name": "Resource-005", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 193, "age": "91+ days", "deployable": "Non Deployable", "rmg": "Internal - NBC", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 6, "eid": "EMP-0006", "name": "Resource-006", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location D", "days": 191, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 7, "eid": "EMP-0007", "name": "Resource-007", "level": "Software Engineer", "skill": "Business analyst", "dept": "PET", "loc": "Location A", "days": 179, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-09", "leader": "Lead-27"}, {"id": 8, "eid": "EMP-0008", "name": "Resource-008", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 133, "age": "91+ days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 9, "eid": "EMP-0009", "name": "Resource-009", "level": "Software Engineer", "skill": "Web developer", "dept": "Big Data & EDW", "loc": "Location A", "days": 130, "age": "91+ days", "deployable": "Non Deployable", "rmg": "IFB-Shadow", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 10, "eid": "EMP-0010", "name": "Resource-010", "level": "Software Engineer", "skill": "Backend", "dept": "Big Data & EDW", "loc": "Location A", "days": 119, "age": "91+ days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 11, "eid": "EMP-0011", "name": "Resource-011", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 117, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-54"}, {"id": 12, "eid": "EMP-0012", "name": "Resource-012", "level": "Software Engineer", "skill": "Full-Stack", "dept": "Big Data & EDW", "loc": "Location A", "days": 116, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 13, "eid": "EMP-0013", "name": "Resource-013", "level": "Senior Consultant", "skill": "Power Automate", "dept": "Big Data & EDW", "loc": "Location B", "days": 112, "age": "91+ days", "deployable": "Non Deployable", "rmg": "Resigned", "status": "other", "exp": "08-10 Y", "hrbp": "HRBP-03", "leader": "Lead-06"}, {"id": 14, "eid": "EMP-0014", "name": "Resource-014", "level": "Software Engineer", "skill": "SAP", "dept": "ERP Modernization", "loc": "Location G", "days": 109, "age": "91+ days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 15, "eid": "EMP-0015", "name": "Resource-015", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 109, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 16, "eid": "EMP-0016", "name": "Resource-016", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 105, "age": "91+ days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-09", "leader": "Lead-18"}, {"id": 17, "eid": "EMP-0017", "name": "Resource-017", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 105, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-41"}, {"id": 18, "eid": "EMP-0018", "name": "Resource-018", "level": "Software Engineer", "skill": "Cloud Infra & Security", "dept": "Big Data & EDW", "loc": "Location A", "days": 100, "age": "91+ days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 19, "eid": "EMP-0019", "name": "Resource-019", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 98, "age": "91+ days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-41"}, {"id": 20, "eid": "EMP-0020", "name": "Resource-020", "level": "Software Engineer", "skill": "Data Science", "dept": "MWP & Chatbot", "loc": "Location A", "days": 94, "age": "91+ days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-53"}, {"id": 21, "eid": "EMP-0021", "name": "Resource-021", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 91, "age": "91+ days", "deployable": "Non Deployable", "rmg": "Internal - NBC", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 22, "eid": "EMP-0022", "name": "Resource-022", "level": "Senior Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location B", "days": 88, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "Resigned", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-06", "leader": "Lead-15"}, {"id": 23, "eid": "EMP-0023", "name": "Resource-023", "level": "Senior Software Engineer", "skill": "Fabric", "dept": "Big Data & EDW", "loc": "Location A", "days": 87, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available-Pipeline Planned", "status": "available", "exp": "08-10 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 24, "eid": "EMP-0024", "name": "Resource-024", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 86, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-44"}, {"id": 25, "eid": "EMP-0025", "name": "Resource-025", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 84, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 26, "eid": "EMP-0026", "name": "Resource-026", "level": "Senior Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 84, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-20"}, {"id": 27, "eid": "EMP-0027", "name": "Resource-027", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location E", "days": 80, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "Internal - NBNC", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 28, "eid": "EMP-0028", "name": "Resource-028", "level": "Associate Consultant", "skill": "Project Management", "dept": "PET", "loc": "Location A", "days": 79, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-09", "leader": "Lead-23"}, {"id": 29, "eid": "EMP-0029", "name": "Resource-029", "level": "Senior Consultant", "skill": "Project Management", "dept": "PET", "loc": "Location A", "days": 77, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "10-12 Y", "hrbp": "HRBP-09", "leader": "Lead-04"}, {"id": 30, "eid": "EMP-0030", "name": "Resource-030", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 77, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-02"}, {"id": 31, "eid": "EMP-0031", "name": "Resource-031", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 77, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 32, "eid": "EMP-0032", "name": "Resource-032", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 77, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-54"}, {"id": 33, "eid": "EMP-0033", "name": "Resource-033", "level": "Consultant", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location B", "days": 73, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available-Pipeline Planned", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 34, "eid": "EMP-0034", "name": "Resource-034", "level": "Software Engineer", "skill": "AWS ", "dept": "Big Data & EDW", "loc": "Location A", "days": 73, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 35, "eid": "EMP-0035", "name": "Resource-035", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 71, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "Long Leave", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-17"}, {"id": 36, "eid": "EMP-0036", "name": "Resource-036", "level": "Software Engineer", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location B", "days": 71, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 37, "eid": "EMP-0037", "name": "Resource-037", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 70, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "Internal - NBC", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 38, "eid": "EMP-0038", "name": "Resource-038", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 67, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-43"}, {"id": 39, "eid": "EMP-0039", "name": "Resource-039", "level": "Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location A", "days": 67, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 40, "eid": "EMP-0040", "name": "Resource-040", "level": "Software Engineer", "skill": "Sql", "dept": "Big Data & EDW", "loc": "Location A", "days": 63, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 41, "eid": "EMP-0041", "name": "Resource-041", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 63, "age": "61-90 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 42, "eid": "EMP-0042", "name": "Resource-042", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 63, "age": "61-90 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 43, "eid": "EMP-0043", "name": "Resource-043", "level": "Senior Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location C", "days": 60, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 44, "eid": "EMP-0044", "name": "Resource-044", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 58, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 45, "eid": "EMP-0045", "name": "Resource-045", "level": "Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location B", "days": 56, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 46, "eid": "EMP-0046", "name": "Resource-046", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 52, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-46"}, {"id": 47, "eid": "EMP-0047", "name": "Resource-047", "level": "Senior Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location A", "days": 50, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 48, "eid": "EMP-0048", "name": "Resource-048", "level": "Software Engineer", "skill": "FrontEnd", "dept": "Big Data & EDW", "loc": "Location A", "days": 49, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 49, "eid": "EMP-0049", "name": "Resource-049", "level": "Software Engineer", "skill": "Cloud Infra & Security", "dept": "Big Data & EDW", "loc": "Location A", "days": 49, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 50, "eid": "EMP-0050", "name": "Resource-050", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 49, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-06"}, {"id": 51, "eid": "EMP-0051", "name": "Resource-051", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 49, "age": "46-60 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 52, "eid": "EMP-0052", "name": "Resource-052", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location D", "days": 49, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 53, "eid": "EMP-0053", "name": "Resource-053", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 49, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-51"}, {"id": 54, "eid": "EMP-0054", "name": "Resource-054", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location B", "days": 46, "age": "46-60 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-01", "leader": "Lead-21"}, {"id": 55, "eid": "EMP-0055", "name": "Resource-055", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 45, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-01", "leader": "Lead-21"}, {"id": 56, "eid": "EMP-0056", "name": "Resource-056", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-52"}, {"id": 57, "eid": "EMP-0057", "name": "Resource-057", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 58, "eid": "EMP-0058", "name": "Resource-058", "level": "Associate", "skill": "Cloud Infra & Security", "dept": "Big Data & EDW", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 59, "eid": "EMP-0059", "name": "Resource-059", "level": "Senior Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location F", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-50"}, {"id": 60, "eid": "EMP-0060", "name": "Resource-060", "level": "Software Engineer", "skill": "QA", "dept": "Quality Analyst", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-11"}, {"id": 61, "eid": "EMP-0061", "name": "Resource-061", "level": "Software Engineer", "skill": "Sql", "dept": "Big Data & EDW", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-22"}, {"id": 62, "eid": "EMP-0062", "name": "Resource-062", "level": "Senior Consultant", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 63, "eid": "EMP-0063", "name": "Resource-063", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 64, "eid": "EMP-0064", "name": "Resource-064", "level": "Senior Software Engineer", "skill": "SQL/ETL", "dept": "Big Data & EDW", "loc": "Location A", "days": 42, "age": "31-45 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-36"}, {"id": 65, "eid": "EMP-0065", "name": "Resource-065", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 42, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 66, "eid": "EMP-0066", "name": "Resource-066", "level": "Senior Software Engineer", "skill": "AWS ", "dept": "Big Data & EDW", "loc": "Location A", "days": 40, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 67, "eid": "EMP-0067", "name": "Resource-067", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 39, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 68, "eid": "EMP-0068", "name": "Resource-068", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 39, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-20"}, {"id": 69, "eid": "EMP-0069", "name": "Resource-069", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 39, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 70, "eid": "EMP-0070", "name": "Resource-070", "level": "Software Engineer", "skill": "Web developer", "dept": "MWP & Chatbot", "loc": "Location A", "days": 39, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-41"}, {"id": 71, "eid": "EMP-0071", "name": "Resource-071", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 39, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-01", "leader": "Lead-21"}, {"id": 72, "eid": "EMP-0072", "name": "Resource-072", "level": "Software Engineer", "skill": "Data Science", "dept": "Big Data & EDW", "loc": "Location A", "days": 39, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 73, "eid": "EMP-0073", "name": "Resource-073", "level": "Senior Software Engineer", "skill": "DevOps", "dept": "Big Data & EDW", "loc": "Location A", "days": 38, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 74, "eid": "EMP-0074", "name": "Resource-074", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 38, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 75, "eid": "EMP-0075", "name": "Resource-075", "level": "Senior Consultant", "skill": "Project Management & Governance", "dept": "PET", "loc": "Location A", "days": 36, "age": "31-45 Days", "deployable": "Non Deployable", "rmg": "Delivery OH - Presales", "status": "other", "exp": "12-15 Y", "hrbp": "HRBP-08", "leader": "Lead-01"}, {"id": 76, "eid": "EMP-0076", "name": "Resource-076", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-52"}, {"id": 77, "eid": "EMP-0077", "name": "Resource-077", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location C", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-10"}, {"id": 78, "eid": "EMP-0078", "name": "Resource-078", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-09"}, {"id": 79, "eid": "EMP-0079", "name": "Resource-079", "level": "Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location C", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 80, "eid": "EMP-0080", "name": "Resource-080", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-51"}, {"id": 81, "eid": "EMP-0081", "name": "Resource-081", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 82, "eid": "EMP-0082", "name": "Resource-082", "level": "Software Engineer", "skill": "App Development", "dept": "App Development", "loc": "Location C", "days": 35, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 83, "eid": "EMP-0083", "name": "Resource-083", "level": "Software Engineer", "skill": "FrontEnd", "dept": "MWP & Chatbot", "loc": "Location A", "days": 34, "age": "31-45 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-06"}, {"id": 84, "eid": "EMP-0084", "name": "Resource-084", "level": "Software Engineer", "skill": "AWS ", "dept": "Devops & App Modernization", "loc": "Location A", "days": 32, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "06-08 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 85, "eid": "EMP-0085", "name": "Resource-085", "level": "Senior Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 32, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 86, "eid": "EMP-0086", "name": "Resource-086", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 32, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-01", "leader": "Lead-21"}, {"id": 87, "eid": "EMP-0087", "name": "Resource-087", "level": "Senior Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location B", "days": 32, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-22"}, {"id": 88, "eid": "EMP-0088", "name": "Resource-088", "level": "Principal Consultant", "skill": "Data Science", "dept": "Big Data & EDW", "loc": "Location B", "days": 32, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "15+ Y", "hrbp": "HRBP-07", "leader": "Lead-44"}, {"id": 89, "eid": "EMP-0089", "name": "Resource-089", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 32, "age": "31-45 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 90, "eid": "EMP-0090", "name": "Resource-090", "level": "Consultant", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location D", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 91, "eid": "EMP-0091", "name": "Resource-091", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 92, "eid": "EMP-0092", "name": "Resource-092", "level": "Consultant", "skill": "SQL/ETL", "dept": "Big Data & EDW", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 93, "eid": "EMP-0093", "name": "Resource-093", "level": "Consultant", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-20"}, {"id": 94, "eid": "EMP-0094", "name": "Resource-094", "level": "Software Engineer", "skill": "Sql", "dept": "Big Data & EDW", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 95, "eid": "EMP-0095", "name": "Resource-095", "level": "Software Engineer", "skill": "Cloud Infra & Security", "dept": "Big Data & EDW", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 96, "eid": "EMP-0096", "name": "Resource-096", "level": "Software Engineer", "skill": "Business analyst", "dept": "PET", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-09", "leader": "Lead-27"}, {"id": 97, "eid": "EMP-0097", "name": "Resource-097", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-50"}, {"id": 98, "eid": "EMP-0098", "name": "Resource-098", "level": "Senior Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location C", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-50"}, {"id": 99, "eid": "EMP-0099", "name": "Resource-099", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-01", "leader": "Lead-25"}, {"id": 100, "eid": "EMP-0100", "name": "Resource-100", "level": "Consultant", "skill": "Sql", "dept": "Big Data & EDW", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "08-10 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 101, "eid": "EMP-0101", "name": "Resource-101", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 102, "eid": "EMP-0102", "name": "Resource-102", "level": "Senior Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location D", "days": 28, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 103, "eid": "EMP-0103", "name": "Resource-103", "level": "Senior Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location B", "days": 25, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available-Pipeline Planned", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 104, "eid": "EMP-0104", "name": "Resource-104", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 25, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-03"}, {"id": 105, "eid": "EMP-0105", "name": "Resource-105", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 25, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-08", "leader": "Lead-05"}, {"id": 106, "eid": "EMP-0106", "name": "Resource-106", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 25, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-52"}, {"id": 107, "eid": "EMP-0107", "name": "Resource-107", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 24, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 108, "eid": "EMP-0108", "name": "Resource-108", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 23, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-09", "leader": "Lead-16"}, {"id": 109, "eid": "EMP-0109", "name": "Resource-109", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 23, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 110, "eid": "EMP-0110", "name": "Resource-110", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location C", "days": 23, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-07"}, {"id": 111, "eid": "EMP-0111", "name": "Resource-111", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location C", "days": 23, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-10"}, {"id": 112, "eid": "EMP-0112", "name": "Resource-112", "level": "Software Engineer", "skill": "Full-Stack", "dept": "Big Data & EDW", "loc": "Location A", "days": 23, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 113, "eid": "EMP-0113", "name": "Resource-113", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 114, "eid": "EMP-0114", "name": "Resource-114", "level": "Consultant", "skill": "SQL/ETL", "dept": "Big Data & EDW", "loc": "Location A", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 115, "eid": "EMP-0115", "name": "Resource-115", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 116, "eid": "EMP-0116", "name": "Resource-116", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 117, "eid": "EMP-0117", "name": "Resource-117", "level": "Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location A", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 118, "eid": "EMP-0118", "name": "Resource-118", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available-Pipeline Planned", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 119, "eid": "EMP-0119", "name": "Resource-119", "level": "Software Engineer", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location C", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 120, "eid": "EMP-0120", "name": "Resource-120", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available-Pipeline Planned", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 121, "eid": "EMP-0121", "name": "Resource-121", "level": "Senior Consultant", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 21, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 122, "eid": "EMP-0122", "name": "Resource-122", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 20, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 123, "eid": "EMP-0123", "name": "Resource-123", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 18, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-28"}, {"id": 124, "eid": "EMP-0124", "name": "Resource-124", "level": "Senior Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location C", "days": 17, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-07"}, {"id": 125, "eid": "EMP-0125", "name": "Resource-125", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 16, "age": "16-30 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 126, "eid": "EMP-0126", "name": "Resource-126", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 15, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-10"}, {"id": 127, "eid": "EMP-0127", "name": "Resource-127", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location B", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 128, "eid": "EMP-0128", "name": "Resource-128", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 129, "eid": "EMP-0129", "name": "Resource-129", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 130, "eid": "EMP-0130", "name": "Resource-130", "level": "Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 131, "eid": "EMP-0131", "name": "Resource-131", "level": "Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 132, "eid": "EMP-0132", "name": "Resource-132", "level": "Software Engineer", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 133, "eid": "EMP-0133", "name": "Resource-133", "level": "Software Engineer", "skill": "Sql", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-01", "leader": "Lead-21"}, {"id": 134, "eid": "EMP-0134", "name": "Resource-134", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-44"}, {"id": 135, "eid": "EMP-0135", "name": "Resource-135", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-43"}, {"id": 136, "eid": "EMP-0136", "name": "Resource-136", "level": "Consultant", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 137, "eid": "EMP-0137", "name": "Resource-137", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-12"}, {"id": 138, "eid": "EMP-0138", "name": "Resource-138", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Internal - NBNC", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-41"}, {"id": 139, "eid": "EMP-0139", "name": "Resource-139", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 140, "eid": "EMP-0140", "name": "Resource-140", "level": "Principal Consultant", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "06-08 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 141, "eid": "EMP-0141", "name": "Resource-141", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 142, "eid": "EMP-0142", "name": "Resource-142", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-34"}, {"id": 143, "eid": "EMP-0143", "name": "Resource-143", "level": "Senior Consultant", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location C", "days": 14, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "08-10 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 144, "eid": "EMP-0144", "name": "Resource-144", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 145, "eid": "EMP-0145", "name": "Resource-145", "level": "Senior Software Engineer", "skill": "DevOps", "dept": "Devops & App Modernization", "loc": "Location E", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-26"}, {"id": 146, "eid": "EMP-0146", "name": "Resource-146", "level": "Consultant", "skill": "SAP Technical", "dept": "ERP Modernization", "loc": "Location C", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "06-08 Y", "hrbp": "HRBP-02", "leader": "Lead-32"}, {"id": 147, "eid": "EMP-0147", "name": "Resource-147", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-02"}, {"id": 148, "eid": "EMP-0148", "name": "Resource-148", "level": "Software Engineer", "skill": "DevOps", "dept": "Big Data & EDW", "loc": "Location A", "days": 14, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 149, "eid": "EMP-0149", "name": "Resource-149", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 13, "age": "0-15 Days", "deployable": "Deployable", "rmg": "New Joiner", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-45"}, {"id": 150, "eid": "EMP-0150", "name": "Resource-150", "level": "Senior Software Engineer", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location C", "days": 13, "age": "0-15 Days", "deployable": "Deployable", "rmg": "New Joiner", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 151, "eid": "EMP-0151", "name": "Resource-151", "level": "Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location A", "days": 13, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 152, "eid": "EMP-0152", "name": "Resource-152", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location F", "days": 13, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-10"}, {"id": 153, "eid": "EMP-0153", "name": "Resource-153", "level": "Software Engineer", "skill": "App Development", "dept": "App Development", "loc": "Location A", "days": 13, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-47"}, {"id": 154, "eid": "EMP-0154", "name": "Resource-154", "level": "Senior Principal Consultant", "skill": "SAP Technical", "dept": "Big Data & EDW", "loc": "Location C", "days": 11, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "12-15 Y", "hrbp": "HRBP-01", "leader": "Lead-25"}, {"id": 155, "eid": "EMP-0155", "name": "Resource-155", "level": "Lead Tech Architect", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 11, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "12-15 Y", "hrbp": "HRBP-08", "leader": "Lead-05"}, {"id": 156, "eid": "EMP-0156", "name": "Resource-156", "level": "Senior Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location A", "days": 11, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 157, "eid": "EMP-0157", "name": "Resource-157", "level": "Senior Principal Consultant", "skill": "Data Science", "dept": "Data Science", "loc": "Location F", "days": 11, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "12-15 Y", "hrbp": "HRBP-06", "leader": "Lead-10"}, {"id": 158, "eid": "EMP-0158", "name": "Resource-158", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 11, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-07"}, {"id": 159, "eid": "EMP-0159", "name": "Resource-159", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 11, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 160, "eid": "EMP-0160", "name": "Resource-160", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 9, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 161, "eid": "EMP-0161", "name": "Resource-161", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location E", "days": 7, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 162, "eid": "EMP-0162", "name": "Resource-162", "level": "Software Engineer", "skill": "Cloud Infra & Security", "dept": "Big Data & EDW", "loc": "Location A", "days": 7, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 163, "eid": "EMP-0163", "name": "Resource-163", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location G", "days": 7, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-44"}, {"id": 164, "eid": "EMP-0164", "name": "Resource-164", "level": "Senior Principal Consultant", "skill": "Product Management", "dept": "PET", "loc": "Location B", "days": 7, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "10-12 Y", "hrbp": "HRBP-09", "leader": "Lead-27"}, {"id": 165, "eid": "EMP-0165", "name": "Resource-165", "level": "Software Engineer", "skill": "Sql", "dept": "Data Science", "loc": "Location A", "days": 7, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Internal - MIC", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-48"}, {"id": 166, "eid": "EMP-0166", "name": "Resource-166", "level": "Software Engineer", "skill": "Fabric", "dept": "Big Data & EDW", "loc": "Location B", "days": 7, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 167, "eid": "EMP-0167", "name": "Resource-167", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 7, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 168, "eid": "EMP-0168", "name": "Resource-168", "level": "Software Engineer", "skill": "SQL/ETL", "dept": "Big Data & EDW", "loc": "Location A", "days": 4, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Extension", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-54"}, {"id": 169, "eid": "EMP-0169", "name": "Resource-169", "level": "Associate Consultant", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 4, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-07"}, {"id": 170, "eid": "EMP-0170", "name": "Resource-170", "level": "Senior Consultant", "skill": "App Development", "dept": "App Development", "loc": "Location A", "days": 3, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 171, "eid": "EMP-0171", "name": "Resource-171", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 3, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-12"}, {"id": 172, "eid": "EMP-0172", "name": "Resource-172", "level": "Software Engineer", "skill": "Energy & Sustainability / ESG", "dept": "Big Data & EDW", "loc": "Location C", "days": 2, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 173, "eid": "EMP-0173", "name": "Resource-173", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-03", "leader": "Lead-20"}, {"id": 174, "eid": "EMP-0174", "name": "Resource-174", "level": "Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 175, "eid": "EMP-0175", "name": "Resource-175", "level": "Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 176, "eid": "EMP-0176", "name": "Resource-176", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-14"}, {"id": 177, "eid": "EMP-0177", "name": "Resource-177", "level": "Senior Software Engineer", "skill": "App Development", "dept": "App Development", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available-Upskilling", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 178, "eid": "EMP-0178", "name": "Resource-178", "level": "Senior Software Engineer", "skill": "Data Science", "dept": "MWP & Chatbot", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-53"}, {"id": 179, "eid": "EMP-0179", "name": "Resource-179", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-51"}, {"id": 180, "eid": "EMP-0180", "name": "Resource-180", "level": "Consultant", "skill": "Project Management", "dept": "PET", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "06-08 Y", "hrbp": "HRBP-09", "leader": "Lead-42"}, {"id": 181, "eid": "EMP-0181", "name": "Resource-181", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 182, "eid": "EMP-0182", "name": "Resource-182", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 183, "eid": "EMP-0183", "name": "Resource-183", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-45"}, {"id": 184, "eid": "EMP-0184", "name": "Resource-184", "level": "Software Engineer", "skill": "Chatbot", "dept": "MWP & Chatbot", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-08", "leader": "Lead-24"}, {"id": 185, "eid": "EMP-0185", "name": "Resource-185", "level": "Software Engineer", "skill": "Cloud Infra & Security", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-30"}, {"id": 186, "eid": "EMP-0186", "name": "Resource-186", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-43"}, {"id": 187, "eid": "EMP-0187", "name": "Resource-187", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Billed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 188, "eid": "EMP-0188", "name": "Resource-188", "level": "Senior Software Engineer", "skill": "Sustainability & Energy", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 189, "eid": "EMP-0189", "name": "Resource-189", "level": "Software Engineer", "skill": "Data Science", "dept": "MWP & Chatbot", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-53"}, {"id": 190, "eid": "EMP-0190", "name": "Resource-190", "level": "Senior Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-45"}, {"id": 191, "eid": "EMP-0191", "name": "Resource-191", "level": "Principal Consultant", "skill": "Project Management", "dept": "PET", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "10-12 Y", "hrbp": "HRBP-09", "leader": "Lead-42"}, {"id": 192, "eid": "EMP-0192", "name": "Resource-192", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location E", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 193, "eid": "EMP-0193", "name": "Resource-193", "level": "Software Engineer", "skill": "Chatbot", "dept": "MWP & Chatbot", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-08", "leader": "Lead-24"}, {"id": 194, "eid": "EMP-0194", "name": "Resource-194", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-33"}, {"id": 195, "eid": "EMP-0195", "name": "Resource-195", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-06"}, {"id": 196, "eid": "EMP-0196", "name": "Resource-196", "level": "Software Engineer", "skill": "Power Apps", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-03", "leader": "Lead-06"}, {"id": 197, "eid": "EMP-0197", "name": "Resource-197", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-09", "leader": "Lead-16"}, {"id": 198, "eid": "EMP-0198", "name": "Resource-198", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-22"}, {"id": 199, "eid": "EMP-0199", "name": "Resource-199", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 200, "eid": "EMP-0200", "name": "Resource-200", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-22"}, {"id": 201, "eid": "EMP-0201", "name": "Resource-201", "level": "Senior Software Engineer", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 202, "eid": "EMP-0202", "name": "Resource-202", "level": "Software Engineer", "skill": "SQL/ETL", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-51"}, {"id": 203, "eid": "EMP-0203", "name": "Resource-203", "level": "Consultant", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Internal - MIC", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-01", "leader": "Lead-21"}, {"id": 204, "eid": "EMP-0204", "name": "Resource-204", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 205, "eid": "EMP-0205", "name": "Resource-205", "level": "Consultant", "skill": "Project Management & Governance", "dept": "PET", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Proposed", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 206, "eid": "EMP-0206", "name": "Resource-206", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-36"}, {"id": 207, "eid": "EMP-0207", "name": "Resource-207", "level": "Software Engineer", "skill": "Chatbot", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-43"}, {"id": 208, "eid": "EMP-0208", "name": "Resource-208", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 209, "eid": "EMP-0209", "name": "Resource-209", "level": "Consultant", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 210, "eid": "EMP-0210", "name": "Resource-210", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-06", "leader": "Lead-45"}, {"id": 211, "eid": "EMP-0211", "name": "Resource-211", "level": "Software Engineer", "skill": "Business Intelligence", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 212, "eid": "EMP-0212", "name": "Resource-212", "level": "Consultant", "skill": "Project Management & Governance", "dept": "PET", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "08-10 Y", "hrbp": "HRBP-09", "leader": "Lead-42"}, {"id": 213, "eid": "EMP-0213", "name": "Resource-213", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-06", "leader": "Lead-28"}, {"id": 214, "eid": "EMP-0214", "name": "Resource-214", "level": "Software Engineer", "skill": "Full-Stack", "dept": "MWP & Chatbot", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Billed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-53"}, {"id": 215, "eid": "EMP-0215", "name": "Resource-215", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-39"}, {"id": 216, "eid": "EMP-0216", "name": "Resource-216", "level": "Senior Software Engineer", "skill": "Backend", "dept": "MWP & Chatbot", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-08"}, {"id": 217, "eid": "EMP-0217", "name": "Resource-217", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 218, "eid": "EMP-0218", "name": "Resource-218", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 219, "eid": "EMP-0219", "name": "Resource-219", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 220, "eid": "EMP-0220", "name": "Resource-220", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Billed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 221, "eid": "EMP-0221", "name": "Resource-221", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-36"}, {"id": 222, "eid": "EMP-0222", "name": "Resource-222", "level": "Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 223, "eid": "EMP-0223", "name": "Resource-223", "level": "Software Engineer", "skill": "App Development", "dept": "App Development", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 224, "eid": "EMP-0224", "name": "Resource-224", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location F", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-19"}, {"id": 225, "eid": "EMP-0225", "name": "Resource-225", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-52"}, {"id": 226, "eid": "EMP-0226", "name": "Resource-226", "level": "Senior Software Engineer", "skill": "App Development", "dept": "App Development", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 227, "eid": "EMP-0227", "name": "Resource-227", "level": "Software Engineer", "skill": "UI/UX", "dept": "App Development", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Billed", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 228, "eid": "EMP-0228", "name": "Resource-228", "level": "Consultant", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 229, "eid": "EMP-0229", "name": "Resource-229", "level": "Principal Consultant", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Extension", "status": "other", "exp": "10-12 Y", "hrbp": "HRBP-05", "leader": "Lead-49"}, {"id": 230, "eid": "EMP-0230", "name": "Resource-230", "level": "Senior Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location C", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Reserved", "status": "ifb", "exp": "06-08 Y", "hrbp": "HRBP-10", "leader": "Lead-34"}, {"id": 231, "eid": "EMP-0231", "name": "Resource-231", "level": "Consultant", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "Long Leave", "status": "other", "exp": "06-08 Y", "hrbp": "HRBP-06", "leader": "Lead-07"}, {"id": 232, "eid": "EMP-0232", "name": "Resource-232", "level": "Software Engineer", "skill": "Databricks", "dept": "Big Data & EDW", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 233, "eid": "EMP-0233", "name": "Resource-233", "level": "Senior Software Engineer", "skill": "FrontEnd", "dept": "App Development", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "03-06 Y", "hrbp": "HRBP-04", "leader": "Lead-35"}, {"id": 234, "eid": "EMP-0234", "name": "Resource-234", "level": "Senior Software Engineer", "skill": "Power BI", "dept": "Big Data & EDW", "loc": "Location B", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "03-06 Y", "hrbp": "HRBP-07", "leader": "Lead-38"}, {"id": 235, "eid": "EMP-0235", "name": "Resource-235", "level": "Software Engineer", "skill": "Data Science", "dept": "Data Science", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-09", "leader": "Lead-40"}, {"id": 236, "eid": "EMP-0236", "name": "Resource-236", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Pending with HRBP", "status": "other", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}, {"id": 237, "eid": "EMP-0237", "name": "Resource-237", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Deployable", "rmg": "Available", "status": "available", "exp": "0-03 Y", "hrbp": "HRBP-05", "leader": "Lead-29"}, {"id": 238, "eid": "EMP-0238", "name": "Resource-238", "level": "Software Engineer", "skill": "Big Data & EDW", "dept": "Big Data & EDW", "loc": "Location A", "days": 0, "age": "0-15 Days", "deployable": "Non Deployable", "rmg": "IFB-Selected", "status": "ifb", "exp": "0-03 Y", "hrbp": "HRBP-10", "leader": "Lead-13"}];
+
+// ─── REGISTER ───────────────────────────────────────────────────────────────
+let currentFilter = 'all', currentSearch = '';
+
+const rmgPill = (st, rmg) => {
+  const map = {
+    available:'pill-green', ifb:'pill-purple', upskilling:'pill-blue',
+    proposed:'pill-yellow', pending:'pill-gray', internal:'pill-gray',
+    billed:'pill-green', pipeline:'pill-blue', extension:'pill-blue',
+    resigned:'pill-red', leave:'pill-gray', other:'pill-gray'
+  };
+  return `<span class="pill ${map[st]||'pill-gray'}">${rmg}</span>`;
+};
+const ageColor = d => d>=91?'#b5364a':d>=61?'#c04030':d>=46?'#b5641a':d>=16?'#2a78aa':'#2e7d6e';
+
+let _podHrbp = '', _podLeader = '';
+
+function applyPodFilter(type, val) {
+  if (type === 'hrbp')   _podHrbp   = val || '';
+  if (type === 'leader') _podLeader = val || '';
+  document.querySelectorAll('#podHrbpFilter').forEach(el  => el.value = _podHrbp);
+  document.querySelectorAll('#podLeaderFilter').forEach(el => el.value = _podLeader);
+  const res = ALL_RESOURCES.filter(r => podMatch(r));
+  const total = res.length;
+  const countText = (_podHrbp || _podLeader) ? `${total} of 238` : '';
+  document.querySelectorAll('#podFilterCount').forEach(el => el.textContent = countText);
+
+  // ── Register tab ──
+  renderRegister();
+
+  // ── IFB Pipeline lists ──
+  const ifbSel = res.filter(r=>r.rmg==='IFB-Selected');
+  const ifbRes = res.filter(r=>r.rmg==='IFB-Reserved'||r.rmg==='Available-Pipeline Planned');
+  const noData = '<div style="padding:20px;color:var(--text-muted);font-size:12px;">No resources match filter</div>';
+  const selEl = document.getElementById('ifbSelectedList');
+  const resEl = document.getElementById('ifbReservedList');
+  if (selEl) selEl.innerHTML = ifbSel.length ? ifbSel.map((r,i)=>buildPipelineItem(r,i)).join('') : noData;
+  if (resEl) resEl.innerHTML = ifbRes.length ? ifbRes.map((r,i)=>buildPipelineItem(r,i)).join('') : noData;
+
+  // ── Aging breakdown table ──
+  const depts = ['Big Data & EDW','Data Science','App Development','Devops & App Modernization','MWP & Chatbot','PET','ERP Modernization','Quality Analyst'];
+  const deptLabels = {'Big Data & EDW':'⚙️ Big Data &amp; EDW','Data Science':'🔬 Data Science','App Development':'🌐 App Development','Devops & App Modernization':'☁️ DevOps &amp; App Mod','MWP & Chatbot':'🤖 MWP &amp; Chatbot','PET':'🔧 PET','ERP Modernization':'📦 ERP Modernization','Quality Analyst':'✅ Quality Analyst'};
+  const agingBuckets = ['0-15 Days','16-30 Days','31-45 Days','46-60 Days','61-90 Days','91+ days'];
+  const agingBody = document.getElementById('agingTableBody');
+  if (agingBody) {
+    agingBody.innerHTML = depts.map(dept => {
+      const dr = res.filter(r=>r.dept===dept);
+      if (!dr.length) return '';
+      const counts = agingBuckets.map(b => dr.filter(r=>r.age===b).length);
+      const critical = counts[5];
+      const pct = dr.length ? Math.round((critical/dr.length)*100) : 0;
+      const risk = pct>20?'<span class="pill pill-red">High</span>':pct>10?'<span class="pill pill-yellow">Medium</span>':'<span class="pill pill-green">Low</span>';
+      return `<tr><td>${deptLabels[dept]||dept}</td><td><strong>${dr.length}</strong></td>${counts.map(c=>`<td>${c}</td>`).join('')}<td>${risk}</td></tr>`;
+    }).join('');
+  }
+
+  // ── Skills chips ──
+  const skillDefs = [
+    {keys:'Big Data',               label:'Big Data &amp; EDW',   icon:'⚙️',  dlKey:'Big Data',               dlLabel:'Big Data & EDW'},
+    {keys:'Data Science',           label:'Data Science',          icon:'🔬',  dlKey:'Data Science',           dlLabel:'Data Science'},
+    {keys:'Databricks',             label:'Databricks',            icon:'🔴',  dlKey:'Databricks',             dlLabel:'Databricks'},
+    {keys:'Power Apps',             label:'Power Apps',            icon:'⚡',  dlKey:'Power Apps',             dlLabel:'Power Apps'},
+    {keys:'DevOps',                 label:'DevOps',                icon:'☁️',  dlKey:'DevOps',                 dlLabel:'DevOps'},
+    {keys:'Power BI',               label:'Power BI',              icon:'📊',  dlKey:'Power BI',               dlLabel:'Power BI'},
+    {keys:'SAP',                    label:'SAP Technical',         icon:'🔷',  dlKey:'SAP',                    dlLabel:'SAP Technical'},
+    {keys:'Full|FrontEnd|Frontend', label:'Full-Stack / FE',       icon:'🌐',  dlKey:'Full|FrontEnd|Frontend', dlLabel:'Full-Stack / FrontEnd'},
+    {keys:'Business Intelligence',  label:'Business Intel.',       icon:'📈',  dlKey:'Business Intelligence',  dlLabel:'Business Intelligence'},
+    {keys:'sql|SQL|ETL',            label:'SQL / ETL',             icon:'🐍',  dlKey:'sql|SQL|ETL',            dlLabel:'SQL / ETL'},
+    {keys:'Cloud',                  label:'Cloud Infra',           icon:'🛡️',  dlKey:'Cloud',                  dlLabel:'Cloud Infra'},
+    {keys:'App Development',        label:'App Development',       icon:'📱',  dlKey:'App Development',        dlLabel:'App Development'}
+  ];
+  const chipsGrid = document.getElementById('skillChipsGrid');
+  if (chipsGrid) {
+    const colorMap = {'⚙️':'#2a78aa','🔬':'#6b3fa0','🔴':'#b5364a','⚡':'#a06020','☁️':'#2e7d6e','📊':'#2a78aa','🔷':'#2a78aa','🌐':'#2e7d6e','📈':'#6b3fa0','🐍':'#2e7d6e','🛡️':'#2e7d6e','📱':'#a06020'};
+    chipsGrid.innerHTML = skillDefs.map(sd => {
+      const parts = sd.keys.split('|');
+      const count = res.filter(r=>r.skill && parts.some(k=>r.skill.toLowerCase().includes(k.toLowerCase()))).length;
+      const col = colorMap[sd.icon]||'var(--text-primary)';
+      return `<div class="skill-chip" onclick="downloadSkillDetail('${sd.dlKey}','${sd.dlLabel}')" style="cursor:pointer;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:14px;gap:4px;background:linear-gradient(135deg,rgba(135,196,239,.22),var(--bg));transition:box-shadow .2s;">
+        <div style="font-size:16px;">${sd.icon}</div>
+        <div style="font-size:20px;font-weight:800;color:${col};line-height:1.1;">${count}</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text-primary);">${sd.label}</div>
+        <div style="font-size:8px;color:var(--text-muted);margin-top:1px;">↓ Download list</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Location bars ──
+  const locColors = ['linear-gradient(90deg,#9b8fe0,#b8aee8)','linear-gradient(90deg,#87c4ef,#6ab4e0)','linear-gradient(90deg,#84d8b8,#6ec8a8)','linear-gradient(90deg,#f8c09a,#f0a878)','linear-gradient(90deg,#d4a8e8,#c08eda)','linear-gradient(90deg,#f09db0,#e88090)','linear-gradient(90deg,#80cece,#60aeae)'];
+  const locBars = document.getElementById('locBarsContainer');
+  if (locBars) {
+    const locCountsObj = {};
+    res.forEach(r=>{ if(r.loc){ locCountsObj[r.loc]=(locCountsObj[r.loc]||0)+1; } });
+    const locCounts = Object.entries(locCountsObj).sort((a,b)=>b[1]-a[1]);
+    const maxLoc = Math.max(...locCounts.map(l=>l[1]), 1);
+    locBars.innerHTML = locCounts.map((l,i)=>`<div class="loc-bar-row"><span class="loc-name">📍 ${l[0]}</span><div class="loc-bar-wrap"><div class="loc-bar" style="width:${Math.round(l[1]/maxLoc*100)}%;background:${locColors[i%locColors.length]};">${l[1]}</div></div><span class="loc-count">${l[1]}</span></div>`).join('');
+  }
+
+  // ── Location stats ──
+  const statsBox = document.getElementById('locationStatsBox');
+  if (statsBox && total > 0) {
+    const avgDays = Math.round(res.reduce((s,r)=>s+r.days,0)/total);
+    const maxDays = Math.max(...res.map(r=>r.days));
+    const critical91 = res.filter(r=>r.age==='91+ days').length;
+    const ifbCount  = res.filter(r=>r.status==='ifb').length;
+    const availCount= res.filter(r=>r.status==='available').length;
+    const deployable= res.filter(r=>r.deployable==='Deployable').length;
+    const nonDeploy = total - deployable;
+    const topDept   = Object.entries(res.reduce((a,r)=>{a[r.dept]=(a[r.dept]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1])[0];
+    const topLoc    = Object.entries(res.reduce((a,r)=>{const l=r.loc.split('-')[0].trim();a[l]=(a[l]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1])[0];
+    const topExp    = Object.entries(res.reduce((a,r)=>{a[r.exp]=(a[r.exp]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1])[0];
+    statsBox.innerHTML = [
+      ['Total Bench',total],['Deployable',`${deployable} (${Math.round(deployable/total*100)}%)`],
+      ['Non Deployable',`<span style="color:#b5364a;">${nonDeploy} (${Math.round(nonDeploy/total*100)}%)</span>`],
+      ['Avg Days on Bench',`${avgDays} days`],
+      ['Max Days on Bench',`<span style="color:#b5364a;">${maxDays} days</span>`],
+      ['Critical (&gt;91 days)',`<span style="color:#b5364a;">${critical91}</span>`],
+      ['In IFB Pipeline',`<span style="color:#6b3fa0;">${ifbCount}</span>`],
+      ['Available (Open)',`<span style="color:#2e7d6e;">${availCount}</span>`],
+      ['Largest Practice',topDept?topDept[0]+' ('+topDept[1]+')':'—'],
+      ['Largest Location',topLoc?topLoc[0]+' ('+topLoc[1]+')':'—'],
+      ['Dominant Experience',topExp?topExp[0]+' ('+topExp[1]+')':'—']
+    ].map(([k,v])=>`<div class="stat-row"><span class="stat-key">${k}</span><span class="stat-val">${v}</span></div>`).join('');
+  }
+
+  // ── Charts ──
+  updateCharts(res);
+}
+
+function clearPodFilter() {
+  _podHrbp = ''; _podLeader = '';
+  document.querySelectorAll('#podHrbpFilter').forEach(el  => el.value = '');
+  document.querySelectorAll('#podLeaderFilter').forEach(el => el.value = '');
+  document.querySelectorAll('#podFilterCount').forEach(el  => el.textContent = '');
+  applyPodFilter();
+}
+
+function updateCharts(res) {
+  if (typeof Chart === 'undefined') return;
+  const depts6 = ['Big Data & EDW','Data Science','App Development','Devops & App Modernization','MWP & Chatbot','PET'];
+  const ageBuckets = ['0-15 Days','16-30 Days','31-45 Days','46-60 Days','61-90 Days','91+ days'];
+
+  // agingByPractice — stacked bar
+  const abp = Chart.getChart('agingByPractice');
+  if (abp) {
+    abp.data.datasets.forEach((ds, bi) => {
+      ds.data = depts6.map(dept => res.filter(r=>r.dept===dept&&r.age===ageBuckets[bi]).length);
+    });
+    abp.update();
+  }
+
+  // skillsBar — horizontal bar by individual skill (re-sorted)
+  const sb = Chart.getChart('skillsBar');
+  if (sb) {
+    const skillMap = {};
+    res.forEach(r=>{ if(r.skill){ const s=r.skill.trim(); skillMap[s]=(skillMap[s]||0)+1; }});
+    const sorted = Object.entries(skillMap).sort((a,b)=>b[1]-a[1]).slice(0,12);
+    sb.data.labels = sorted.map(e=>e[0]);
+    sb.data.datasets[0].data = sorted.map(e=>e[1]);
+    sb.update();
+  }
+
+  // pipelineChart — doughnut by practice for IFB resources
+  const pc = Chart.getChart('pipelineChart');
+  if (pc) {
+    const ifbRes2 = res.filter(r=>r.status==='ifb');
+    pc.data.datasets[0].data = depts6.map(d=>ifbRes2.filter(r=>r.dept===d).length);
+    pc.update();
+  }
+
+  // expChart — bar by experience (values as stored in r.exp)
+  const expBuckets = ['0-03 Y','03-06 Y','06-08 Y','08-10 Y','10-12 Y','12-15 Y','15+ Y'];
+  const ec = Chart.getChart('expChart');
+  if (ec) {
+    ec.data.datasets[0].data = expBuckets.map(b=>res.filter(r=>r.exp===b).length);
+    ec.update();
+  }
+
+  // designationChart — doughnut
+  const desigLabels = ['Software Engineer','Senior Software Engineer','Consultant','Senior Consultant','Principal Consultant'];
+  const dc = Chart.getChart('designationChart');
+  if (dc) {
+    const counts = desigLabels.map(l=>res.filter(r=>r.level===l).length);
+    const other = res.length - counts.reduce((a,b)=>a+b,0);
+    dc.data.datasets[0].data = [...counts, other];
+    dc.update();
+  }
+}
+
+
+function podMatch(r) {
+  return (!_podHrbp || r.hrbp === _podHrbp) && (!_podLeader || r.leader === _podLeader);
+}
+
+function renderRegister(){
+  const tbody = document.getElementById('registerBody');
+  const rows = ALL_RESOURCES.filter(r=>{
+    const pm = podMatch(r);
+    const mf = pm && (currentFilter==='all'||(currentFilter==='critical91'&&r.age==='91+ days')||(currentFilter==='watch'&&r.age==='61-90 Days')||(currentFilter==='available'&&r.status==='available')||(currentFilter==='ifb'&&r.status==='ifb')||(currentFilter==='deployable'&&r.deployable==='Deployable')||(currentFilter==='nondeployable'&&r.deployable==='Non Deployable'));
+    const q=currentSearch.toLowerCase();
+    const ms=!q||r.name.toLowerCase().includes(q)||r.skill.toLowerCase().includes(q)||r.dept.toLowerCase().includes(q)||r.loc.toLowerCase().includes(q)||r.level.toLowerCase().includes(q)||r.rmg.toLowerCase().includes(q);
+    return mf&&ms;
+  });
+  document.getElementById('regCount').textContent = `Showing ${rows.length} of ${ALL_RESOURCES.length} resources`;
+  tbody.innerHTML = rows.map(r=>`<tr>
+    <td style="color:var(--text-muted);font-size:11px;">${r.id}</td>
+    <td style="font-weight:700;">${r.name}</td>
+    <td><span class="pill pill-blue" style="font-size:9px;">${r.level}</span></td>
+    <td>${r.skill||'—'}</td>
+    <td>${r.dept}</td>
+    <td>📍 ${r.loc.replace('- ',', ')}</td>
+    <td style="font-weight:800;color:${ageColor(r.days)};">${r.days}d</td>
+    <td style="font-size:11px;color:var(--text-muted);">${r.exp}</td>
+    <td><span class="pill ${r.deployable==='Deployable'?'pill-green':'pill-red'}">${r.deployable==='Deployable'?'✅ Yes':'🚫 No'}</span></td>
+    <td>${rmgPill(r.status,r.rmg)}</td>
+  </tr>`).join('');
+}
+function filterRegister(){ currentSearch=document.getElementById('registerSearch').value; renderRegister(); }
+function setFilter(f,el){ currentFilter=f; document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); renderRegister(); }
+renderRegister();
+
+// ─── SKILL DRILL-DOWN DOWNLOAD ───────────────────────────────────────────────
+function downloadSkillDetail(keys, label) {
+  const parts = keys.split('|');
+  const filtered = ALL_RESOURCES.filter(r =>
+    r.skill && parts.some(k => r.skill.toLowerCase().includes(k.toLowerCase()))
+  );
+  if (!filtered.length) { alert('No resources found for: ' + label); return; }
+  const rows = filtered.map(r => ({
+    'EID': r.eid,
+    'Name': r.name,
+    'Designation': r.level,
+    'Primary Skill': r.skill,
+    'Practice': r.dept,
+    'Location': r.loc,
+    'Days on Bench': r.days,
+    'Age Bucket': r.age,
+    'Experience': r.exp,
+    'Deployable': r.deployable,
+    'RMG / HRBP Status': r.rmg
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const colWidths = Object.keys(rows[0]).map(k => ({wch: Math.max(k.length, ...rows.map(r => String(r[k]||'').length)) + 2}));
+  ws['!cols'] = colWidths;
+  const wb = XLSX.utils.book_new();
+  const sheetName = label.replace(/[^a-zA-Z0-9 ]/g,'').substring(0,31);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `Skill_${label.replace(/[^a-zA-Z0-9]/g,'_')}_1 Sep 2026.xlsx`);
+}
+
+// ─── LANDING ↔ DASHBOARD TRANSITION ─────────────────────────────────────────
+function goHome() {
+  const ls = document.getElementById('landingScreen');
+  ls.style.display = '';
+  requestAnimationFrame(() => {
+    ls.style.opacity = '0';
+    ls.style.transition = 'none';
+    ls.classList.remove('fade-out');
+    requestAnimationFrame(() => {
+      ls.style.opacity = '';
+      ls.style.transition = '';
+    });
+  });
+  document.body.style.overflow = 'hidden';
+  window.scrollTo(0, 0);
+}
+
+
+// ─── POD FILTER ──────────────────────────────────────────────────────────────
+function openDashboard(tab) {
+  const ls = document.getElementById('landingScreen');
+  ls.classList.add('fade-out');
+  setTimeout(() => {
+    ls.style.display = 'none';
+    document.body.style.overflow = '';
+    switchTab(tab || 'overview');
+    window.scrollTo(0, 0);
+    setTimeout(() => {
+      if (typeof Chart !== 'undefined') {
+        Object.values(Chart.instances).forEach(c => { try { c.resize(); } catch(e){} });
+      }
+    }, 150);
+  }, 400);
+}
+
+document.body.style.overflow = 'hidden';
+document.getElementById('landingScreen').addEventListener('wheel', e => e.stopPropagation(), {passive:true});
+
+(function(){
+  const hash = location.hash.replace('#','');
+  if (hash && document.getElementById('tab-' + hash)) {
+    openDashboard(hash);
+  }
+})();
+
+// ─── IFB PIPELINE LIST ────────────────────────────────────────────────────────
+const avatarColors = ['linear-gradient(135deg,#9b8fe0,#b8aee8)','linear-gradient(135deg,#84d8b8,#6ec8a8)','linear-gradient(135deg,#87c4ef,#6ab4e0)','linear-gradient(135deg,#f09db0,#e88090)','linear-gradient(135deg,#d4a8e8,#c08eda)','linear-gradient(135deg,#f8c09a,#f0a878)'];
+const initials = n => n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+function buildPipelineItem(r,i){
+  return `<div class="pipeline-item">
+    <div class="ro-avatar" style="background:${avatarColors[i%6]}">${initials(r.name)}</div>
+    <div><div class="ro-name">${r.name}</div><div class="ro-meta">${r.skill||r.dept} · ${r.loc.replace('- ',', ')}</div></div>
+    <div class="ro-days"><div class="d-num" style="color:${ageColor(r.days)};">${r.days}</div><div class="d-lbl">days on bench</div></div>
+  </div>`;
+}
+
+const ifbSel = ALL_RESOURCES.filter(r=>r.rmg==='IFB-Selected');
+const ifbRes = ALL_RESOURCES.filter(r=>r.rmg==='IFB-Reserved'||r.rmg==='Available-Pipeline Planned');
+document.getElementById('ifbSelectedList').innerHTML = ifbSel.map((r,i)=>buildPipelineItem(r,i)).join('');
+document.getElementById('ifbReservedList').innerHTML = ifbRes.map((r,i)=>buildPipelineItem(r,i)).join('');
+
+// ─── INITIAL SYNC ─────────────────────────────────────────────────────────────
+// Populate the Aging table, Skill chips, and Location bars/stats with real
+// (unfiltered) data immediately on load, instead of leaving the placeholder
+// numbers baked into the HTML until a user touches a POD filter. Runs before
+// chart creation so it still happens even if the Chart.js CDN fails to load.
+applyPodFilter();
+
+// ─── CHARTS ──────────────────────────────────────────────────────────────────
+
+const pluginDef = {
+  legend: { labels:{ color:'#718096', font:{size:11}, boxWidth:12 } },
+  tooltip: { backgroundColor:'#e8eaf6', titleColor:'#2d3748', bodyColor:'#718096', borderColor:'#b0b8d8', borderWidth:1, padding:10, cornerRadius:10 }
+};
+const gs = { color:'rgba(176,184,216,.25)', drawBorder:false };
+const ts = { color:'#718096', font:{size:10} };
+
+new Chart(document.getElementById('benchByPractice'),{
+  type:'doughnut',
+  data:{ labels:['Big Data & EDW','Data Science','App Development','DevOps & App Mod','MWP & Chatbot','PET','ERP Modernization','Quality Analyst'],
+    datasets:[{data:[156,35,14,10,10,10,2,1],backgroundColor:['#87c4ef','#9b8fe0','#84d8b8','#80cece','#d4a8e8','#f8c09a','#f09db0','#f4a094'],borderWidth:0,hoverOffset:8}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{color:'#718096',font:{size:10},boxWidth:10}},tooltip:pluginDef.tooltip}}
+});
+
+new Chart(document.getElementById('agingSnap'),{
+  type:'bar',
+  data:{ labels:['0–15 Days','16–30 Days','31–45 Days','46–60 Days','61–90 Days','91+ Days'],
+    datasets:[{data:[113,36,35,12,21,21],
+      backgroundColor:['rgba(132,216,184,.8)','rgba(135,196,239,.8)','rgba(248,192,154,.8)','rgba(240,157,176,.8)','rgba(197,184,240,.8)','rgba(181,54,74,.8)'],
+      borderRadius:8}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:pluginDef.tooltip},
+    scales:{x:{grid:{display:false},ticks:ts},y:{grid:gs,ticks:ts}}}
+});
+
+new Chart(document.getElementById('statusBreak'),{
+  type:'doughnut',
+  data:{ labels:['Deployable','Non Deployable'],
+    datasets:[{data:[191,47],backgroundColor:['#84d8b8','#f09db0'],borderWidth:0,hoverOffset:6}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+    plugins:{legend:{display:false},tooltip:pluginDef.tooltip}}
+});
+
+new Chart(document.getElementById('agingByPractice'),{
+  type:'bar',
+  data:{ labels:['Big Data & EDW','Data Science','App Dev','DevOps','MWP & Chatbot','PET'],
+    datasets:[
+      {label:'0–15d', data:[69,18,11,3,6,5], backgroundColor:'rgba(132,216,184,.8)', borderRadius:4},
+      {label:'16–30d',data:[23,9,1,2,0,1], backgroundColor:'rgba(135,196,239,.8)', borderRadius:4},
+      {label:'31–45d',data:[23,3,2,3,2,1], backgroundColor:'rgba(248,192,154,.8)', borderRadius:4},
+      {label:'46–60d',data:[11,1,0,0,0,0],  backgroundColor:'rgba(240,157,176,.8)', borderRadius:4},
+      {label:'61–90d',data:[15,3,0,1,0,2],  backgroundColor:'rgba(197,184,240,.8)', borderRadius:4},
+      {label:'91+d',  data:[15,1,0,1,2,1], backgroundColor:'rgba(181,54,74,.7)', borderRadius:4}
+    ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{...pluginDef},
+    scales:{x:{stacked:true,grid:{display:false},ticks:ts},y:{stacked:true,grid:gs,ticks:ts}}}
+});
+
+// Skills horizontal bar — compute from data
+(()=>{
+  const skillMap = {};
+  ALL_RESOURCES.forEach(r=>{ if(r.skill){ const s=r.skill.trim(); skillMap[s]=(skillMap[s]||0)+1; }});
+  const sorted = Object.entries(skillMap).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  new Chart(document.getElementById('skillsBar'),{
+    type:'bar',
+    data:{ labels:sorted.map(e=>e[0]), datasets:[{label:'On Bench', data:sorted.map(e=>e[1]),
+      backgroundColor:['rgba(135,196,239,.8)','rgba(155,143,224,.8)','rgba(132,216,184,.8)','rgba(248,192,154,.8)','rgba(240,157,176,.8)','rgba(128,206,206,.8)','rgba(212,168,232,.8)','rgba(168,212,168,.8)','rgba(244,160,148,.8)','rgba(248,230,168,.8)','rgba(197,184,240,.8)','rgba(135,196,239,.6)'],
+      borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:pluginDef.tooltip},
+      scales:{x:{grid:gs,ticks:ts},y:{grid:{display:false},ticks:{...ts,font:{size:9}}}}}
+  });
+})();
+
+// Pipeline chart — source distribution bar
+new Chart(document.getElementById('pipelineChart'),{
+  type:'bar',
+  data:{ labels:['Bench','Partial Bench','Internal Project','Delivery OH','Proposed','New Joiner','Reserved'],
+    datasets:[
+      {label:'Deployable', data:[194,154,0,0,24,11,0], backgroundColor:'rgba(132,216,184,.85)', borderRadius:6},
+      {label:'Non Deployable', data:[64,13,111,49,0,5,3], backgroundColor:'rgba(240,157,176,.85)', borderRadius:6}
+    ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{...pluginDef},
+    scales:{x:{stacked:true,grid:{display:false},ticks:ts},y:{stacked:true,grid:gs,ticks:ts}}}
+});
+
+// Experience chart
+new Chart(document.getElementById('expChart'),{
+  type:'bar',
+  data:{ labels:['0–3 Y','3–6 Y','6–8 Y','8–10 Y','10–12 Y','12–15 Y','15+ Y'],
+    datasets:[{label:'Resources', data:[125,84,13,6,4,4,2],
+      backgroundColor:['rgba(135,196,239,.85)','rgba(155,143,224,.85)','rgba(132,216,184,.85)','rgba(248,192,154,.85)','rgba(240,157,176,.85)','rgba(212,168,232,.85)','rgba(128,206,206,.85)'],
+      borderRadius:8}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:pluginDef.tooltip},
+    scales:{x:{grid:{display:false},ticks:ts},y:{grid:gs,ticks:ts}}}
+});
+
+// Designation chart
+new Chart(document.getElementById('designationChart'),{
+  type:'doughnut',
+  data:{ labels:['Software Engineer','Senior Software Engineer','Consultant','Senior Consultant','Principal Consultant','Other'],
+    datasets:[{data:[162,41,15,8,4,8],backgroundColor:['#87c4ef','#9b8fe0','#84d8b8','#f8c09a','#f09db0','#c5b8f0'],
+      borderWidth:2,hoverOffset:6}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,position:'bottom',labels:{...ts,boxWidth:10,padding:8}},tooltip:pluginDef.tooltip},
+    cutout:'60%'}
+});
+
+// ─── INITIAL SYNC (charts) ────────────────────────────────────────────────────
+// Re-run now that the Chart.js instances above exist, so agingByPractice,
+// skillsBar, pipelineChart, expChart and designationChart also show real data
+// immediately rather than their placeholder values until a filter is touched.
+applyPodFilter();
+
+</script>
+</body>
+</html>

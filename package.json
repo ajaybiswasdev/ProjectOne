@@ -1,0 +1,9 @@
+{
+  "name": "bench-management-platform",
+  "private": true,
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "python -m uvicorn app.main:app --reload --app-dir apps/api",
+    "seed:api": "python apps/api/scripts/seed_resources.py"
+  }
+}
