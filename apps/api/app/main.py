@@ -1,12 +1,16 @@
+import json
 import logging
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
+from app.database import Base, SessionLocal, engine
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
+from app.models import Resource
 from app.routers.resources import analytics_router, router as resources_router, summary_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -61,6 +65,61 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/api/v1/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "version": "1.0.0"}
+
+
+# ── Auto-setup: create tables + seed data on first start ──────────────────────
+@app.on_event("startup")
+def auto_setup():
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified")
+
+        data_file = Path(__file__).parent / "seed_data" / "resources.json"
+        if not data_file.exists():
+            logger.warning("Seed data file not found: %s", data_file)
+            return
+
+        with SessionLocal() as db:
+            from sqlalchemy import func
+            count = db.query(func.count(Resource.id)).scalar()
+            if count and count > 0:
+                logger.info("Database already has %d resources, skipping seed", count)
+                return
+
+        from sqlalchemy.dialects.postgresql import insert
+        rows = json.loads(data_file.read_text(encoding="utf-8"))
+        payload = []
+        for row in rows:
+            payload.append({
+                "id": row["id"],
+                "employee_id": row["eid"],
+                "name": row["name"],
+                "level": row["level"],
+                "skill": row.get("skill") or "",
+                "department": row["dept"],
+                "location": row["loc"],
+                "days_on_bench": row["days"],
+                "age_bucket": row["age"],
+                "deployable": row["deployable"],
+                "rmg_status": row["rmg"],
+                "status": row["status"],
+                "experience_bucket": row["exp"],
+                "hrbp": row["hrbp"],
+                "leader": row["leader"],
+            })
+
+        with SessionLocal() as db:
+            stmt = insert(Resource).values(payload)
+            update_cols = {
+                column.name: getattr(stmt.excluded, column.name)
+                for column in Resource.__table__.columns
+                if column.name != "id"
+            }
+            db.execute(stmt.on_conflict_do_update(index_elements=["id"], set_=update_cols))
+            db.commit()
+        logger.info("Seeded %d resources", len(payload))
+    except Exception:
+        logger.exception("Auto-setup failed")
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
