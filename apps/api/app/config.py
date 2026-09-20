@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     debug: bool = False
 
-    model_config = {"env_prefix": "BENCH_", "env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
     def model_post_init(self, __context) -> None:
         if self.database_url.startswith("postgres://"):
