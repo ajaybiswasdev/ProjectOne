@@ -54,14 +54,10 @@ function handleAuthError(status: number) {
 }
 
 export async function adminLogin(username: string, password: string): Promise<{ access_token: string; token_type: string }> {
-  const body = new URLSearchParams();
-  body.append("username", username);
-  body.append("password", password);
-
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Login failed" }));
