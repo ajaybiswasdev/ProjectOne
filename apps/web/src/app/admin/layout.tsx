@@ -1,0 +1,302 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { type ReactNode, useState, useEffect } from "react";
+import { isAdminLoggedIn } from "@/lib/adminApi";
+
+const navLinks = [
+  { href: "/admin", label: "Dashboard", icon: "📊" },
+  { href: "/admin/resources", label: "Resources", icon: "📦" },
+  { href: "/admin/import", label: "Import / Export", icon: "📥" },
+  { href: "/admin/users", label: "Users", icon: "👥" },
+];
+
+const sidebarStyle = {
+  position: "fixed" as const,
+  top: 0,
+  left: 0,
+  width: 240,
+  height: "100vh",
+  background: "#e8eaf6",
+  boxShadow: "6px 0 16px #b0b8d8",
+  display: "flex",
+  flexDirection: "column" as const,
+  zIndex: 200,
+  transition: "transform .28s ease",
+};
+
+const mobileSidebarStyle = {
+  ...sidebarStyle,
+  transform: "translateX(-100%)",
+};
+
+const overlayStyle = {
+  position: "fixed" as const,
+  inset: 0,
+  background: "rgba(0,0,0,.35)",
+  zIndex: 199,
+  display: "none",
+};
+
+const headerStyle = {
+  padding: "20px 20px 16px",
+  borderBottom: "1px solid rgba(163,177,198,.25)",
+};
+
+const logoStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+};
+
+const logoIconStyle = {
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  background: "#6366f1",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 18,
+  color: "#fff",
+  boxShadow: "3px 3px 8px #b0b8d8, -3px -3px 8px #ffffff",
+};
+
+const navContainerStyle = {
+  flex: 1,
+  padding: "16px 12px",
+  overflowY: "auto" as const,
+};
+
+const linkBaseStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "10px 14px",
+  borderRadius: 10,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#a0aec0",
+  textDecoration: "none",
+  marginBottom: 4,
+  transition: "all .18s",
+  background: "transparent",
+  border: "none",
+  width: "100%",
+  cursor: "pointer" as const,
+};
+
+const linkActiveStyle = {
+  ...linkBaseStyle,
+  color: "#6366f1",
+  background: "rgba(99,102,241,.08)",
+  boxShadow: "inset 3px 3px 8px #b0b8d8, inset -3px -3px 8px #ffffff",
+};
+
+const logoutBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "10px 14px",
+  borderRadius: 10,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#e97b8a",
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  width: "100%",
+  marginBottom: 4,
+  transition: "all .18s",
+};
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!isAdminLoggedIn() && pathname !== "/admin/login") {
+      router.push("/admin/login");
+    }
+  }, [pathname, router]);
+
+  if (pathname === "/admin/login") {
+    return <>{children}</>;
+  }
+
+  if (!mounted) return null;
+
+  function handleLogout() {
+    localStorage.removeItem("admin_token");
+    router.push("/admin/login");
+  }
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open menu"
+        style={{
+          position: "fixed",
+          top: 12,
+          left: 12,
+          zIndex: 300,
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          border: "none",
+          background: "#e8eaf6",
+          boxShadow: "3px 3px 8px #b0b8d8, -3px -3px 8px #ffffff",
+          display: "none",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 18,
+          cursor: "pointer",
+        }}
+        className="admin-hamburger"
+      >
+        ☰
+      </button>
+
+      {/* Sidebar */}
+      <aside
+        className="admin-sidebar"
+        style={sidebarOpen ? sidebarStyle : { ...sidebarStyle, transform: "translateX(-100%)" }}
+      >
+        <div style={headerStyle}>
+          <div style={logoStyle}>
+            <div style={logoIconStyle}>⚙</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#1e293b" }}>Admin Panel</div>
+              <div style={{ fontSize: 10, color: "#a0aec0" }}>Management Console</div>
+            </div>
+          </div>
+        </div>
+
+        <nav style={navContainerStyle}>
+          {navLinks.map((link) => {
+            const isActive =
+              link.href === "/admin"
+                ? pathname === "/admin"
+                : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                style={isActive ? linkActiveStyle : linkBaseStyle}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span style={{ fontSize: 16 }}>{link.icon}</span>
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div style={{ padding: "12px", borderTop: "1px solid rgba(163,177,198,.25)" }}>
+          <Link
+            href="/"
+            style={{
+              ...linkBaseStyle,
+              color: "#5c6bc0",
+              marginBottom: 4,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>🏠</span>
+            Back to App
+          </Link>
+          <button onClick={handleLogout} style={logoutBtnStyle}>
+            <span style={{ fontSize: 16 }}>🚪</span>
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* Overlay for mobile */}
+      <div
+        style={sidebarOpen ? { ...overlayStyle, display: "block" } : overlayStyle}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      {/* Main content */}
+      <main
+        style={{
+          marginLeft: 0,
+          minHeight: "100vh",
+          padding: 12,
+        }}
+        className="admin-main"
+      >
+        {/* Top bar */}
+        <header
+          className="neo"
+          style={{
+            padding: "12px 20px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <div>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>
+              Admin Panel
+            </h1>
+            <p style={{ fontSize: 11, color: "#a0aec0" }}>
+              Bench Management · Administrative Console
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                padding: "6px 14px",
+                borderRadius: 20,
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#6366f1",
+                background: "#e8eaf6",
+                boxShadow: "2px 2px 6px #b0b8d8, -2px -2px 6px #ffffff",
+              }}
+            >
+              👤 Admin
+            </div>
+          </div>
+        </header>
+
+        <div className="dash-content">{children}</div>
+      </main>
+
+      {/* Responsive CSS */}
+      <style jsx global>{`
+        .admin-hamburger {
+          display: none !important;
+        }
+        .admin-sidebar {
+          transform: translateX(-100%);
+        }
+        .admin-main {
+          margin-left: 240px;
+        }
+        @media (max-width: 768px) {
+          .admin-hamburger {
+            display: flex !important;
+          }
+          .admin-sidebar {
+            transform: translateX(0) !important;
+          }
+          .admin-main {
+            margin-left: 0 !important;
+            padding-top: 56px !important;
+          }
+        }
+      `}</style>
+    </>
+  );
+}
