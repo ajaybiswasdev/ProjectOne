@@ -221,7 +221,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       {/* Main content */}
       <main
         style={{
-          marginLeft: 0,
           minHeight: "100vh",
           padding: 12,
         }}
@@ -293,7 +292,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           transform: translateX(0) !important;
         }
         .admin-main {
-          margin-left: 240px;
+          margin-left: 240px !important;
         }
         @media (max-width: 768px) {
           .admin-hamburger {
