@@ -4,7 +4,9 @@ import json
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from urllib.parse import urlparse
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -342,8 +344,28 @@ def _token_response(user: User, org: Organization | None) -> TokenResponse:
     )
 
 
-def _frontend_link(path: str) -> str:
-    return f"{get_settings().frontend_url.rstrip('/')}{path}"
+def _request_origin(request: Request | None) -> str:
+    if request is None:
+        return ""
+    raw = request.headers.get("origin") or request.headers.get("referer") or ""
+    if not raw:
+        return ""
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return ""
+
+
+def _frontend_link(path: str, request: Request | None = None) -> str:
+    cfg = get_settings()
+    configured = cfg.frontend_url.rstrip("/")
+    origin = _request_origin(request)
+    # Prefer the browser origin (Vercel prod / local dev) over the localhost default.
+    if origin and ("localhost" in configured or "127.0.0.1" in configured or not configured):
+        return f"{origin}{path}"
+    if configured and "localhost" not in configured and "127.0.0.1" not in configured:
+        return f"{configured}{path}"
+    return f"{origin or configured or 'http://localhost:3000'}{path}"
 
 
 def _active_token(db: Session, token: str, kind: str) -> AuthToken | None:
@@ -398,7 +420,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
 
 @auth_router.post("/register", response_model=RegisterResponse)
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
+def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
     if db.query(User).filter(User.email == req.email).first():
@@ -471,7 +493,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
             RegisterInviteLink(
                 email=mate.email,
                 role=mate.role,
-                link=_frontend_link(f"/invite?token={token}"),
+                link=_frontend_link(f"/invite?token={token}", request),
                 expires_at=expires,
             )
         )
@@ -520,7 +542,7 @@ def public_roles(industry: str = "professional", db: Session = Depends(get_db)):
 # ── Password reset (self-service + admin-mediated; no SMTP required) ─────────
 
 @auth_router.post("/password/forgot")
-def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(req: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
     settings_ = get_settings()
     if user and user.is_active:
@@ -550,7 +572,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
         if settings_.debug:
             return {
                 "detail": "If that email exists, a reset link has been created.",
-                "dev_link": _frontend_link(f"/reset-password?token={token}"),
+                "dev_link": _frontend_link(f"/reset-password?token={token}", request),
             }
         _ = org
     return {"detail": "If that email exists, a reset link has been created."}
@@ -922,6 +944,7 @@ def list_invites(
 @admin_router.post("/invites", response_model=ResetLinkResponse)
 def create_invite(
     body: InviteCreate,
+    request: Request,
     db: Session = Depends(get_db),
     admin: User = Depends(require_permission(Permission.USER_WRITE)),
 ):
@@ -968,7 +991,7 @@ def create_invite(
         detail=f"{body.email} as {body.role}",
     )
     db.commit()
-    return ResetLinkResponse(token=token, link=_frontend_link(f"/invite?token={token}"), expires_at=expires)
+    return ResetLinkResponse(token=token, link=_frontend_link(f"/invite?token={token}", request), expires_at=expires)
 
 
 @admin_router.delete("/invites/{invite_id}")
@@ -996,6 +1019,7 @@ def revoke_invite(
 @admin_router.post("/users/{user_id}/reset-link", response_model=ResetLinkResponse)
 def admin_reset_link(
     user_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     admin: User = Depends(require_permission(Permission.USER_WRITE)),
 ):
@@ -1025,7 +1049,7 @@ def admin_reset_link(
         detail=f"Reset link for {target.username}",
     )
     db.commit()
-    return ResetLinkResponse(token=token, link=_frontend_link(f"/reset-password?token={token}"), expires_at=expires)
+    return ResetLinkResponse(token=token, link=_frontend_link(f"/reset-password?token={token}", request), expires_at=expires)
 
 
 @admin_router.put("/users/{user_id}/password", response_model=UserRead)
