@@ -59,12 +59,33 @@ class TokenResponse(BaseModel):
     permissions: list[str]
 
 
+class RegisterTeammate(BaseModel):
+    email: EmailStr
+    role: str = Field(default="viewer", max_length=40)
+
+
+class RegisterInviteLink(BaseModel):
+    email: str
+    role: str
+    link: str
+    expires_at: str
+
+
+class RegisterResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: str
+    invites: list[RegisterInviteLink] = []
+
+
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=80)
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
     org_name: str = Field(min_length=2, max_length=120)
     industry: str = Field(default="professional", max_length=40)
+    teammates: list[RegisterTeammate] = Field(default_factory=list, max_length=10)
 
 
 class InviteUserRequest(BaseModel):
@@ -376,7 +397,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     return _token_response(user, org)
 
 
-@auth_router.post("/register", response_model=UserRead)
+@auth_router.post("/register", response_model=RegisterResponse)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
@@ -385,6 +406,21 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
     industry = req.industry if req.industry in VALID_INDUSTRIES else "professional"
     preset = INDUSTRY_PRESETS[industry]
+    allowed_roles = role_keys_for_industry(industry)
+
+    seen_emails: set[str] = {req.email.lower()}
+    for mate in req.teammates:
+        key = mate.email.lower()
+        if key in seen_emails:
+            raise HTTPException(status_code=400, detail=f"Duplicate teammate email: {mate.email}")
+        seen_emails.add(key)
+        if mate.role not in allowed_roles:
+            allowed = ", ".join(sorted(allowed_roles))
+            raise HTTPException(status_code=422, detail=f"Teammate role must be one of: {allowed}")
+        if mate.role == "owner":
+            raise HTTPException(status_code=422, detail="Only the workspace creator can be Owner")
+        if db.query(User).filter(User.email == mate.email).first():
+            raise HTTPException(status_code=400, detail=f"Email already registered: {mate.email}")
 
     org = Organization(
         name=req.org_name,
@@ -415,9 +451,48 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         resource="org",
         detail=f"Workspace '{org.name}' created by {user.username}",
     )
+
+    invites: list[RegisterInviteLink] = []
+    for mate in req.teammates:
+        token = new_token()
+        expires = token_expiry(INVITE_TOKEN_TTL_HOURS)
+        db.add(
+            AuthToken(
+                org_id=org.id,
+                email=mate.email,
+                role=mate.role,
+                token=token,
+                kind="invite",
+                expires_at=expires,
+                created_by=user.id,
+            )
+        )
+        invites.append(
+            RegisterInviteLink(
+                email=mate.email,
+                role=mate.role,
+                link=_frontend_link(f"/invite?token={token}"),
+                expires_at=expires,
+            )
+        )
+        audit(
+            db,
+            org_id=org.id,
+            user=user,
+            action="invite.created",
+            resource="users",
+            detail=f"{mate.email} as {mate.role} (at signup)",
+        )
+
     db.commit()
     db.refresh(user)
-    return user
+    return RegisterResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        invites=invites,
+    )
 
 
 @auth_router.get("/me", response_model=MeResponse)

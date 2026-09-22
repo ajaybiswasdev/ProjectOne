@@ -3,7 +3,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getPublicRoles, publicRegister, type RoleOption } from "@/lib/adminApi";
+import {
+  getPublicRoles,
+  publicRegister,
+  type RegisterInviteLink,
+  type RegisterTeammate,
+  type RoleOption,
+} from "@/lib/adminApi";
 
 const INDUSTRIES = [
   { value: "professional", label: "Professional Services", desc: "Consulting, staffing, workforce" },
@@ -11,7 +17,6 @@ const INDUSTRIES = [
   { value: "education", label: "Education", desc: "Schools, universities, cohorts" },
 ];
 
-// Local fallback so the preview never depends on a live API call
 const ROLE_FALLBACK: Record<string, RoleOption[]> = {
   professional: [
     { value: "owner", label: "Owner", desc: "Full control of the workspace" },
@@ -33,6 +38,8 @@ const ROLE_FALLBACK: Record<string, RoleOption[]> = {
   ],
 };
 
+type TeamRow = { email: string; role: string };
+
 export default function RegisterPage() {
   const router = useRouter();
   const [orgName, setOrgName] = useState("");
@@ -42,17 +49,37 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [teammates, setTeammates] = useState<TeamRow[]>([]);
+  const [inviteLinks, setInviteLinks] = useState<RegisterInviteLink[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const selectableRoles = roles.filter((r) => r.value !== "owner");
+
   useEffect(() => {
-    // Instant industry-specific fallback while (or if) the API call runs
-    setRoles(ROLE_FALLBACK[industry] ?? ROLE_FALLBACK.professional);
+    const catalog = ROLE_FALLBACK[industry] ?? ROLE_FALLBACK.professional;
+    setRoles(catalog);
+    const firstSelectable = catalog.find((r) => r.value !== "owner")?.value ?? "viewer";
+    setTeammates((prev) =>
+      prev.map((row) => {
+        const stillValid = catalog.some((r) => r.value === row.role && r.value !== "owner");
+        return stillValid ? row : { ...row, role: firstSelectable };
+      }),
+    );
 
     let cancelled = false;
     getPublicRoles(industry)
       .then((r) => {
-        if (!cancelled && r.roles.length > 0) setRoles(r.roles);
+        if (!cancelled && r.roles.length > 0) {
+          setRoles(r.roles);
+          const fb = r.roles.find((ro) => ro.value !== "owner")?.value ?? "viewer";
+          setTeammates((prev) =>
+            prev.map((row) => {
+              const stillValid = r.roles.some((ro) => ro.value === row.role && ro.value !== "owner");
+              return stillValid ? row : { ...row, role: fb };
+            }),
+          );
+        }
       })
       .catch(() => {
         /* keep local fallback */
@@ -61,6 +88,20 @@ export default function RegisterPage() {
       cancelled = true;
     };
   }, [industry]);
+
+  function addTeammate() {
+    if (teammates.length >= 5) return;
+    const defaultRole = selectableRoles[0]?.value ?? "viewer";
+    setTeammates((prev) => [...prev, { email: "", role: defaultRole }]);
+  }
+
+  function updateTeammate(index: number, patch: Partial<TeamRow>) {
+    setTeammates((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function removeTeammate(index: number) {
+    setTeammates((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -73,14 +114,41 @@ export default function RegisterPage() {
       setError("Password must be at least 6 characters");
       return;
     }
+    const filled = teammates.filter((t) => t.email.trim());
+    if (filled.some((t) => !t.role)) {
+      setError("Pick a role for each teammate");
+      return;
+    }
+    if (new Set(filled.map((t) => t.email.toLowerCase())).size !== filled.length) {
+      setError("Teammate emails must be unique");
+      return;
+    }
+
     setLoading(true);
     try {
-      await publicRegister(username, email, password, orgName, industry);
+      const payload: RegisterTeammate[] = filled.map((t) => ({
+        email: t.email.trim(),
+        role: t.role,
+      }));
+      const result = await publicRegister(username, email, password, orgName, industry, payload);
+      if (result.invites?.length) {
+        setInviteLinks(result.invites);
+        setLoading(false);
+        return;
+      }
       router.push("/admin/login");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
-    } finally {
       setLoading(false);
+    }
+  }
+
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Invite link copied");
+    } catch {
+      prompt("Copy invite link:", text);
     }
   }
 
@@ -107,6 +175,136 @@ export default function RegisterPage() {
     letterSpacing: 0.8,
   };
 
+  if (inviteLinks.length > 0) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#e8eaf6",
+          padding: 16,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 520,
+            padding: 40,
+            borderRadius: 20,
+            background: "#e8eaf6",
+            boxShadow: "6px 6px 16px #b0b8d8, -6px -6px 16px #ffffff",
+          }}
+        >
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                background: "#10b981",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 24,
+                color: "#fff",
+                margin: "0 auto 16px",
+                boxShadow: "4px 4px 10px #b0b8d8, -4px -4px 10px #ffffff",
+              }}
+            >
+              ✅
+            </div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1e293b", marginBottom: 4 }}>
+              Workspace created
+            </h1>
+            <p style={{ fontSize: 13, color: "#a0aec0" }}>
+              Copy these invite links and send them to your teammates
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
+            {inviteLinks.map((inv) => (
+              <div
+                key={inv.email + inv.role}
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  background: "rgba(99,102,241,.06)",
+                  boxShadow: "inset 2px 2px 6px #b0b8d8, inset -2px -2px 6px #ffffff",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                  <strong style={{ fontSize: 13, color: "#1e293b" }}>{inv.email}</strong>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: "#6366f1",
+                      background: "rgba(99,102,241,.12)",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {selectableRoles.find((r) => r.value === inv.role)?.label ?? inv.role}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#475569",
+                    wordBreak: "break-all",
+                    marginBottom: 10,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {inv.link}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(inv.link)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#6366f1",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: "3px 3px 8px #b0b8d8, -3px -3px 8px #ffffff",
+                  }}
+                >
+                  Copy link
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <Link
+            href="/admin/login"
+            style={{
+              display: "block",
+              textAlign: "center",
+              width: "100%",
+              padding: "12px 0",
+              borderRadius: 10,
+              background: "#6366f1",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 700,
+              textDecoration: "none",
+              boxShadow: "4px 4px 10px #b0b8d8, -4px -4px 10px #ffffff",
+            }}
+          >
+            Continue to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -121,7 +319,7 @@ export default function RegisterPage() {
       <div
         style={{
           width: "100%",
-          maxWidth: 460,
+          maxWidth: 480,
           padding: 40,
           borderRadius: 20,
           background: "#e8eaf6",
@@ -215,45 +413,140 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {roles.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Team roles for this workspace</label>
-              <div
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Your role</label>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "rgba(99,102,241,.08)",
+                boxShadow: "inset 2px 2px 6px #b0b8d8, inset -2px -2px 6px #ffffff",
+              }}
+            >
+              <span
                 style={{
-                  display: "grid",
-                  gap: 8,
-                  padding: 12,
-                  borderRadius: 12,
-                  background: "rgba(99,102,241,.06)",
-                  boxShadow: "inset 2px 2px 6px #b0b8d8, inset -2px -2px 6px #ffffff",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: "#6366f1",
+                  background: "rgba(99,102,241,.14)",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.4,
                 }}
               >
-                {roles.map((r) => (
-                  <div key={r.value} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: "#6366f1",
-                        background: "rgba(99,102,241,.12)",
-                        padding: "3px 8px",
-                        borderRadius: 999,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.4,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {r.label}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>{r.desc}</span>
-                  </div>
-                ))}
-                <p style={{ fontSize: 10, color: "#a0aec0", margin: "2px 0 0" }}>
-                  You&apos;ll be the <strong>Owner</strong>. Invite the other roles after signup.
-                </p>
-              </div>
+                Owner
+              </span>
+              <span style={{ fontSize: 12, color: "#64748b" }}>
+                Full control — set when the workspace is created
+              </span>
             </div>
-          )}
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Invite teammates</label>
+              <button
+                type="button"
+                onClick={addTeammate}
+                disabled={teammates.length >= 5}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: teammates.length >= 5 ? "#a0aec0" : "#6366f1",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: teammates.length >= 5 ? "not-allowed" : "pointer",
+                  padding: 0,
+                }}
+              >
+                + Add
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: "#a0aec0", margin: "0 0 8px" }}>
+              Optional — pick a role and email; we&apos;ll generate invite links after signup.
+            </p>
+
+            {teammates.length === 0 && (
+              <button
+                type="button"
+                onClick={addTeammate}
+                style={{
+                  width: "100%",
+                  padding: "10px 0",
+                  borderRadius: 10,
+                  border: "1px dashed #b0b8d8",
+                  background: "transparent",
+                  color: "#6366f1",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                + Add teammate with a role
+              </button>
+            )}
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {teammates.map((row, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto auto",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <input
+                    type="email"
+                    value={row.email}
+                    onChange={(e) => updateTeammate(i, { email: e.target.value })}
+                    placeholder="teammate@company.com"
+                    required
+                    style={{ ...inputStyle, padding: "10px 12px", fontSize: 12 }}
+                  />
+                  <select
+                    value={row.role}
+                    onChange={(e) => updateTeammate(i, { role: e.target.value })}
+                    style={{
+                      ...inputStyle,
+                      padding: "10px 10px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      width: "auto",
+                      minWidth: 120,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {selectableRoles.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeTeammate(i)}
+                    aria-label="Remove teammate"
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "#e97b8a",
+                      fontSize: 16,
+                      cursor: "pointer",
+                      padding: "0 4px",
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Username</label>

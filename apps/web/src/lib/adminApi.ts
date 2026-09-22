@@ -125,6 +125,26 @@ export type RoleList = {
   roles: RoleOption[];
 };
 
+export type RegisterTeammate = {
+  email: string;
+  role: string;
+};
+
+export type RegisterInviteLink = {
+  email: string;
+  role: string;
+  link: string;
+  expires_at: string;
+};
+
+export type RegisterResult = {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  invites: RegisterInviteLink[];
+};
+
 function authHeaders(): HeadersInit {
   const token = getToken();
   const headers: HeadersInit = { Accept: "application/json" };
@@ -184,11 +204,12 @@ export async function publicRegister(
   password: string,
   orgName: string,
   industry: string,
-): Promise<AdminUser> {
+  teammates: RegisterTeammate[] = [],
+): Promise<RegisterResult> {
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email, password, org_name: orgName, industry }),
+    body: JSON.stringify({ username, email, password, org_name: orgName, industry, teammates }),
   });
   if (res.ok) return res.json();
   throw await parseError(res, "Registration failed");
