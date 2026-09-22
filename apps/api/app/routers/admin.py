@@ -21,7 +21,13 @@ from app.config import get_settings
 from app.database import get_db
 from app.models import ApiKey, AuditLog, AuthToken, Organization, Resource, User
 from app.plans import PLANS, plan_for, valid_plan
-from app.rbac import Permission, permissions_for
+from app.rbac import (
+    Permission,
+    permissions_for,
+    remap_role_for_industry,
+    roles_for_industry,
+    role_keys_for_industry,
+)
 from app.schemas import ResourceRead
 from app.security import (
     INVITE_TOKEN_TTL_HOURS,
@@ -246,7 +252,17 @@ class PlanUpdate(BaseModel):
     plan: str
 
 
-VALID_ROLES = {"owner", "admin", "editor", "viewer"}
+class RoleOption(BaseModel):
+    value: str
+    label: str
+    desc: str
+
+
+class RoleList(BaseModel):
+    industry: str
+    roles: list[RoleOption]
+
+
 VALID_INDUSTRIES = {"professional", "healthcare", "education"}
 
 INDUSTRY_PRESETS = {
@@ -324,6 +340,18 @@ def _org_user_count(db: Session, org_id: int) -> int:
 
 def _org_resource_count(db: Session, org_id: int) -> int:
     return db.query(func.count(Resource.id)).filter(Resource.org_id == org_id).scalar() or 0
+
+
+def _org_industry(db: Session, org_id: int) -> str:
+    org = db.get(Organization, org_id)
+    return org.industry if org else "professional"
+
+
+def _require_role_in_industry(role: str, industry: str) -> None:
+    keys = role_keys_for_industry(industry)
+    if role not in keys:
+        allowed = ", ".join(sorted(keys))
+        raise HTTPException(status_code=422, detail=f"Role must be one of: {allowed}")
 
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
@@ -404,6 +432,14 @@ def get_me(user: User = Depends(require_user), db: Session = Depends(get_db)):
         permissions=permissions_for(user.role),
         organization=_org_read(org) if org else None,
     )
+
+
+@auth_router.get("/roles", response_model=RoleList)
+def public_roles(industry: str = "professional", db: Session = Depends(get_db)):
+    """Public role catalog for the register page (no auth)."""
+    _ = db
+    ind = industry if industry in VALID_INDUSTRIES else "professional"
+    return RoleList(industry=ind, roles=[RoleOption(**r) for r in roles_for_industry(ind)])
 
 
 # ── Password reset (self-service + admin-mediated; no SMTP required) ─────────
@@ -511,7 +547,9 @@ def accept_invite(req: InviteAccept, db: Session = Depends(get_db)):
         username=req.username,
         email=row.email,
         hashed_password=get_password_hash(req.password),
-        role=row.role if row.role in VALID_ROLES else "viewer",
+        role=remap_role_for_industry(row.role, org.industry)
+        if row.role not in role_keys_for_industry(org.industry)
+        else row.role,
         created_at=datetime.now(timezone.utc).isoformat(),
     )
     db.add(user)
@@ -566,12 +604,21 @@ def update_org_settings(
     if data.unit_label is not None:
         org.unit_label = data.unit_label
     if data.industry is not None and data.industry in VALID_INDUSTRIES:
+        industry_changed = data.industry != org.industry
         org.industry = data.industry
         preset = INDUSTRY_PRESETS[data.industry]
         if data.app_name is None:
             org.app_name = preset["app_name"]
         if data.unit_label is None:
             org.unit_label = preset["unit_label"]
+        if industry_changed:
+            # Remap non-admin roles into the new industry catalog
+            for member in db.query(User).filter(User.org_id == org.id).all():
+                if member.role in ("owner", "admin"):
+                    continue
+                new_role = remap_role_for_industry(member.role, data.industry)
+                if new_role != member.role:
+                    member.role = new_role
     if data.settings_json is not None:
         org.settings_json = json.dumps(data.settings_json)
 
@@ -586,6 +633,17 @@ def update_org_settings(
     db.commit()
     db.refresh(org)
     return _org_read(org)
+
+
+# ── Industry roles ───────────────────────────────────────────────────────────
+
+@admin_router.get("/roles", response_model=RoleList)
+def org_roles(
+    user: User = Depends(require_permission(Permission.USER_READ)),
+    db: Session = Depends(get_db),
+):
+    ind = _org_industry(db, user.org_id)
+    return RoleList(industry=ind, roles=[RoleOption(**r) for r in roles_for_industry(ind)])
 
 
 # ── Plan / billing hooks ─────────────────────────────────────────────────────
@@ -665,8 +723,8 @@ def create_user(
     db: Session = Depends(get_db),
     admin: User = Depends(require_permission(Permission.USER_WRITE)),
 ):
-    if req.role not in VALID_ROLES:
-        raise HTTPException(status_code=422, detail=f"Role must be one of: {', '.join(sorted(VALID_ROLES))}")
+    industry = _org_industry(db, admin.org_id)
+    _require_role_in_industry(req.role, industry)
     if req.role == "owner" and admin.role != "owner":
         raise HTTPException(status_code=403, detail="Only the owner can create another owner")
     if db.query(User).filter(User.org_id == admin.org_id, User.username == req.username).first():
@@ -714,8 +772,8 @@ def change_user_role(
     if target.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot change your own role")
     new_role = body.get("role", "")
-    if new_role not in VALID_ROLES:
-        raise HTTPException(status_code=422, detail=f"Role must be one of: {', '.join(sorted(VALID_ROLES))}")
+    industry = _org_industry(db, admin.org_id)
+    _require_role_in_industry(new_role, industry)
     if new_role == "owner" and admin.role != "owner":
         raise HTTPException(status_code=403, detail="Only the owner can grant owner role")
     old_role = target.role
@@ -792,8 +850,10 @@ def create_invite(
     db: Session = Depends(get_db),
     admin: User = Depends(require_permission(Permission.USER_WRITE)),
 ):
-    if body.role not in VALID_ROLES:
-        raise HTTPException(status_code=422, detail=f"Role must be one of: {', '.join(sorted(VALID_ROLES))}")
+    if body.role not in role_keys_for_industry(_org_industry(db, admin.org_id)):
+        industry = _org_industry(db, admin.org_id)
+        allowed = ", ".join(sorted(role_keys_for_industry(industry)))
+        raise HTTPException(status_code=422, detail=f"Role must be one of: {allowed}")
     if body.role == "owner" and admin.role != "owner":
         raise HTTPException(status_code=403, detail="Only the owner can invite an owner")
     if db.query(User).filter(User.org_id == admin.org_id, User.email == body.email).first():

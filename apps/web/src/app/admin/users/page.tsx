@@ -8,8 +8,10 @@ import {
   deleteUser,
   createInvite,
   adminResetLink,
+  getOrgRoles,
   type AdminUser,
   type InviteLink,
+  type RoleOption,
 } from "@/lib/adminApi";
 import { getSessionUser } from "@/lib/session";
 
@@ -74,7 +76,7 @@ const modalStyle = {
   boxShadow: "8px 8px 24px #b0b8d8, -8px -8px 24px #ffffff",
 };
 
-const ROLE_OPTIONS = [
+const FALLBACK_ROLES: RoleOption[] = [
   { value: "viewer", label: "Viewer", desc: "Read-only access" },
   { value: "editor", label: "Editor", desc: "Add and edit data" },
   { value: "admin", label: "Admin", desc: "Manage users & settings" },
@@ -83,8 +85,13 @@ const ROLE_OPTIONS = [
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>(FALLBACK_ROLES);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const defaultRole = () =>
+    roleOptions.find((r) => r.value === "viewer")?.value ??
+    roleOptions.find((r) => r.value !== "owner")?.value ??
+    "viewer";
   const [form, setForm] = useState({ username: "", email: "", password: "", role: "viewer" });
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -113,6 +120,20 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     load();
+    getOrgRoles()
+      .then((r) => {
+        setRoleOptions(r.roles);
+        setForm((prev) => {
+          const valid = r.roles.some((ro) => ro.value === prev.role);
+          if (valid) return prev;
+          const fallback =
+            r.roles.find((ro) => ro.value === "viewer")?.value ??
+            r.roles.find((ro) => ro.value !== "owner")?.value ??
+            "viewer";
+          return { ...prev, role: fallback };
+        });
+      })
+      .catch(() => setRoleOptions(FALLBACK_ROLES));
   }, []);
 
   async function handleCreate(e: FormEvent) {
@@ -124,11 +145,11 @@ export default function AdminUsersPage() {
         const link = await createInvite(form.email, form.role);
         setInviteLink(link);
         setShowForm(false);
-        setForm({ username: "", email: "", password: "", role: "viewer" });
+        setForm({ username: "", email: "", password: "", role: defaultRole() });
       } else {
         await adminCreateUser(form.username, form.email, form.password, form.role);
         setShowForm(false);
-        setForm({ username: "", email: "", password: "", role: "viewer" });
+        setForm({ username: "", email: "", password: "", role: defaultRole() });
         await load();
       }
     } catch (err: unknown) {
@@ -187,10 +208,16 @@ export default function AdminUsersPage() {
       owner: "pill-red",
       admin: "pill-purple",
       editor: "pill-blue",
+      clinical_editor: "pill-blue",
+      faculty_editor: "pill-blue",
       viewer: "pill-gray",
+      observer: "pill-gray",
     };
     return map[role] || "pill-gray";
   };
+
+  const roleLabel = (value: string) =>
+    roleOptions.find((r) => r.value === value)?.label ?? value;
 
   return (
     <div>
@@ -208,7 +235,7 @@ export default function AdminUsersPage() {
 
       {/* Role legend */}
       <div className="neo" style={{ padding: 14, marginBottom: 16, display: "flex", gap: 16, flexWrap: "wrap" }}>
-        {ROLE_OPTIONS.map((r) => (
+        {roleOptions.map((r) => (
           <div key={r.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span className={`pill ${rolePill(r.value)}`}>{r.label}</span>
             <span style={{ fontSize: 10, color: "#a0aec0" }}>{r.desc}</span>
@@ -266,12 +293,12 @@ export default function AdminUsersPage() {
                           cursor: "pointer",
                         }}
                       >
-                        {ROLE_OPTIONS.filter((r) => r.value !== "owner" || isOwner).map((r) => (
+                        {roleOptions.filter((r) => r.value !== "owner" || isOwner).map((r) => (
                           <option key={r.value} value={r.value}>{r.label}</option>
                         ))}
                       </select>
                     ) : (
-                      <span className={`pill ${rolePill(u.role)}`}>{u.role}</span>
+                      <span className={`pill ${rolePill(u.role)}`}>{roleLabel(u.role)}</span>
                     )}
                   </td>
                   <td style={{ fontSize: 11, color: "#a0aec0" }}>
@@ -405,7 +432,7 @@ export default function AdminUsersPage() {
                     onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
                     style={{ ...inputStyle, cursor: "pointer" }}
                   >
-                    {ROLE_OPTIONS.filter((r) => r.value !== "owner" || isOwner).map((r) => (
+                    {roleOptions.filter((r) => r.value !== "owner" || isOwner).map((r) => (
                       <option key={r.value} value={r.value}>
                         {r.label} — {r.desc}
                       </option>

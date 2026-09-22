@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { publicRegister } from "@/lib/adminApi";
+import { getPublicRoles, publicRegister, type RoleOption } from "@/lib/adminApi";
 
 const INDUSTRIES = [
   { value: "professional", label: "Professional Services", desc: "Consulting, staffing, workforce" },
@@ -15,12 +15,27 @@ export default function RegisterPage() {
   const router = useRouter();
   const [orgName, setOrgName] = useState("");
   const [industry, setIndustry] = useState("professional");
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicRoles(industry)
+      .then((r) => {
+        if (!cancelled) setRoles(r.roles);
+      })
+      .catch(() => {
+        if (!cancelled) setRoles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [industry]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -170,7 +185,50 @@ export default function RegisterPage() {
                 </button>
               ))}
             </div>
+            <p style={{ fontSize: 11, color: "#a0aec0", margin: "6px 0 0" }}>
+              {INDUSTRIES.find((i) => i.value === industry)?.desc}
+            </p>
           </div>
+
+          {roles.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Team roles for this workspace</label>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  background: "rgba(99,102,241,.06)",
+                  boxShadow: "inset 2px 2px 6px #b0b8d8, inset -2px -2px 6px #ffffff",
+                }}
+              >
+                {roles.map((r) => (
+                  <div key={r.value} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: "#6366f1",
+                        background: "rgba(99,102,241,.12)",
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.4,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {r.label}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>{r.desc}</span>
+                  </div>
+                ))}
+                <p style={{ fontSize: 10, color: "#a0aec0", margin: "2px 0 0" }}>
+                  You&apos;ll be the <strong>Owner</strong>. Invite the other roles after signup.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Username</label>
@@ -214,6 +272,7 @@ export default function RegisterPage() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
+              minLength={6}
               style={inputStyle}
             />
           </div>

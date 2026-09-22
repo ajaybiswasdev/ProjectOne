@@ -114,6 +114,17 @@ export type InvitePreview = {
   valid: boolean;
 };
 
+export type RoleOption = {
+  value: string;
+  label: string;
+  desc: string;
+};
+
+export type RoleList = {
+  industry: string;
+  roles: RoleOption[];
+};
+
 function authHeaders(): HeadersInit {
   const token = getToken();
   const headers: HeadersInit = { Accept: "application/json" };
@@ -280,6 +291,23 @@ export async function adminResetLink(userId: number): Promise<InviteLink> {
   if (res.ok) return res.json();
   handleAuthError(res.status);
   throw await parseError(res, "Failed to create reset link");
+}
+
+// ── Roles ────────────────────────────────────────────────────────────────────
+
+export async function getPublicRoles(industry: string): Promise<RoleList> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/auth/roles?industry=${encodeURIComponent(industry)}`,
+  );
+  if (res.ok) return res.json();
+  throw await parseError(res, "Failed to load roles");
+}
+
+export async function getOrgRoles(): Promise<RoleList> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/roles`, { headers: authHeaders() });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to load roles");
 }
 
 // ── Audit log ────────────────────────────────────────────────────────────────

@@ -115,7 +115,10 @@ const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
   admin: "Admin",
   editor: "Editor",
+  clinical_editor: "Clinical Editor",
+  faculty_editor: "Faculty Editor",
   viewer: "Viewer",
+  observer: "Observer",
 };
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
