@@ -6,6 +6,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 
+function authHeader(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("admin_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // ── Types (single source of truth matches apps/api/schemas.py) ───────────────
 
 export type Resource = {
@@ -91,10 +97,15 @@ async function apiFetch<T>(path: string, params?: Record<string, string>, retrie
       const response = await fetch(url.toString(), {
         signal: controller.signal,
         next: { revalidate: 30 },
-        headers: { Accept: "application/json" },
+        headers: { Accept: "application/json", ...authHeader() },
       });
 
       if (!response.ok) {
+        if (response.status === 401 && typeof window !== "undefined") {
+          localStorage.removeItem("admin_token");
+          localStorage.removeItem("admin_user");
+          window.location.href = "/admin/login";
+        }
         throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
       }
 

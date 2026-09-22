@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.auth import require_user
 from app.database import get_db
-from app.models import Resource
+from app.models import Resource, User
 from app.schemas import (
     AgingBucketSummary,
     AgingDepartmentRow,
@@ -54,13 +55,15 @@ def list_resources(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     age_bucket: str | None = Query(default=None, alias="ageBucket", max_length=50),
+    limit: int | None = Query(default=None, ge=1, le=1000),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[Resource]:
     search = _validate_search(search)
     status = _validate_enum(status, ALLOWED_STATUSES, "status")
     deployable = _validate_enum(deployable, ALLOWED_DEPLOYABLE, "deployable")
 
-    stmt = select(Resource)
+    stmt = select(Resource).where(Resource.org_id == user.org_id)
 
     if search:
         like = f"%{search}%"
@@ -91,13 +94,19 @@ def list_resources(
         stmt = stmt.where(Resource.age_bucket == age_bucket)
 
     stmt = stmt.order_by(Resource.days_on_bench.desc(), Resource.id.asc())
+    if limit:
+        stmt = stmt.limit(limit)
     return list(db.scalars(stmt).all())
 
 
 @router.get("/{resource_id}", response_model=ResourceRead)
-def get_resource(resource_id: int, db: Session = Depends(get_db)) -> Resource:
+def get_resource(
+    resource_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> Resource:
     resource = db.get(Resource, resource_id)
-    if resource is None:
+    if resource is None or resource.org_id != user.org_id:
         raise HTTPException(status_code=404, detail="Resource not found")
     return resource
 
@@ -107,7 +116,8 @@ def get_resource(resource_id: int, db: Session = Depends(get_db)) -> Resource:
 summary_router = APIRouter(tags=["summary"])
 
 
-def _apply_filters(stmt, hrbp: str | None, leader: str | None):
+def _apply_filters(stmt, user: User, hrbp: str | None, leader: str | None):
+    stmt = stmt.where(Resource.org_id == user.org_id)
     if hrbp:
         stmt = stmt.where(Resource.hrbp == hrbp)
     if leader:
@@ -120,10 +130,10 @@ def get_summary(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> SummaryRead:
-    base = _apply_filters(select(Resource), hrbp, leader)
+    base = _apply_filters(select(Resource), user, hrbp, leader)
 
-    # Single query for all aggregates
     agg_stmt = select(
         func.count(Resource.id).label("total"),
         func.sum(case((Resource.deployable == "Deployable", 1), else_=0)).label("deployable"),
@@ -132,7 +142,7 @@ def get_summary(
         func.sum(case((Resource.age_bucket == "91+ days", 1), else_=0)).label("critical_91_plus"),
         func.round(func.avg(Resource.days_on_bench)).label("avg_days"),
     )
-    agg_stmt = _apply_filters(agg_stmt, hrbp, leader)
+    agg_stmt = _apply_filters(agg_stmt, user, hrbp, leader)
     row = db.execute(agg_stmt).one()
     total = row.total or 0
 
@@ -145,10 +155,9 @@ def get_summary(
 
     deployable_count = row.deployable or 0
 
-    # Group-by queries
     def _group_by(column):
         stmt = select(column, func.count(Resource.id)).group_by(column)
-        stmt = _apply_filters(stmt, hrbp, leader)
+        stmt = _apply_filters(stmt, user, hrbp, leader)
         return {r[0]: r[1] for r in db.execute(stmt).all() if r[0]}
 
     return SummaryRead(
@@ -175,6 +184,7 @@ def get_skills(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[SkillCount]:
     stmt = (
         select(Resource.skill, func.count(Resource.id))
@@ -182,7 +192,7 @@ def get_skills(
         .group_by(Resource.skill)
         .order_by(func.count(Resource.id).desc())
     )
-    stmt = _apply_filters(stmt, hrbp, leader)
+    stmt = _apply_filters(stmt, user, hrbp, leader)
     return [SkillCount(skill=row[0], count=row[1]) for row in db.execute(stmt).all()]
 
 
@@ -202,14 +212,14 @@ def get_aging(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[AgingDepartmentRow]:
-    # SQL-aggregated aging by department
     stmt = select(
         Resource.department,
         Resource.age_bucket,
         func.count(Resource.id),
     ).group_by(Resource.department, Resource.age_bucket)
-    stmt = _apply_filters(stmt, hrbp, leader)
+    stmt = _apply_filters(stmt, user, hrbp, leader)
 
     depts: dict[str, dict[str, int]] = {}
     dept_totals: dict[str, int] = {}
@@ -234,9 +244,10 @@ def get_aging_summary(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[AgingBucketSummary]:
     stmt = select(Resource.age_bucket, func.count(Resource.id))
-    stmt = _apply_filters(stmt, hrbp, leader)
+    stmt = _apply_filters(stmt, user, hrbp, leader)
     stmt = stmt.group_by(Resource.age_bucket)
 
     counts = {row[0]: row[1] for row in db.execute(stmt).all()}
@@ -259,20 +270,19 @@ def get_pipeline(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> PipelineSummary:
-    base = _apply_filters(select(Resource).where(Resource.status == "ifb"), hrbp, leader)
-
     agg = select(
         func.sum(case((Resource.rmg_status == "IFB-Selected", 1), else_=0)).label("selected"),
         func.sum(case((Resource.rmg_status == "IFB-Reserved", 1), else_=0)).label("reserved"),
         func.sum(case((Resource.rmg_status == "Available-Pipeline Planned", 1), else_=0)).label("planned"),
         func.sum(case((Resource.rmg_status == "IFB-Shadow", 1), else_=0)).label("shadow"),
     )
-    agg = _apply_filters(agg.where(Resource.status == "ifb"), hrbp, leader)
+    agg = _apply_filters(agg, user, hrbp, leader).where(Resource.status == "ifb")
     row = db.execute(agg).one()
 
     dept_stmt = select(Resource.department, func.count(Resource.id)).where(Resource.status == "ifb").group_by(Resource.department)
-    dept_stmt = _apply_filters(dept_stmt, hrbp, leader)
+    dept_stmt = _apply_filters(dept_stmt, user, hrbp, leader)
     by_dept = {r[0]: r[1] for r in db.execute(dept_stmt).all()}
 
     return PipelineSummary(
@@ -292,13 +302,14 @@ def get_locations(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[LocationCount]:
     stmt = (
         select(Resource.location, func.count(Resource.id))
         .group_by(Resource.location)
         .order_by(func.count(Resource.id).desc())
     )
-    stmt = _apply_filters(stmt, hrbp, leader)
+    stmt = _apply_filters(stmt, user, hrbp, leader)
     return [LocationCount(location=row[0], count=row[1]) for row in db.execute(stmt).all()]
 
 
@@ -310,13 +321,14 @@ def get_experience(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[ExperienceBucket]:
     stmt = (
         select(Resource.experience_bucket, func.count(Resource.id))
         .group_by(Resource.experience_bucket)
         .order_by(func.count(Resource.id).desc())
     )
-    stmt = _apply_filters(stmt, hrbp, leader)
+    stmt = _apply_filters(stmt, user, hrbp, leader)
     return [ExperienceBucket(bucket=row[0], count=row[1]) for row in db.execute(stmt).all()]
 
 
@@ -328,13 +340,14 @@ def get_designations(
     hrbp: str | None = Query(default=None, max_length=50),
     leader: str | None = Query(default=None, max_length=50),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> list[DesignationCount]:
     stmt = (
         select(Resource.level, func.count(Resource.id))
         .group_by(Resource.level)
         .order_by(func.count(Resource.id).desc())
     )
-    stmt = _apply_filters(stmt, hrbp, leader)
+    stmt = _apply_filters(stmt, user, hrbp, leader)
     return [DesignationCount(level=row[0], count=row[1]) for row in db.execute(stmt).all()]
 
 
@@ -342,10 +355,14 @@ def get_designations(
 
 
 @analytics_router.get("/filters", response_model=FilterOptions)
-def get_filters(db: Session = Depends(get_db)) -> FilterOptions:
-    distinct = lambda col: sorted(
-        [r[0] for r in db.execute(select(col).distinct()).all() if r[0]]
-    )
+def get_filters(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> FilterOptions:
+    def distinct(col):
+        stmt = select(col).where(Resource.org_id == user.org_id).distinct()
+        return sorted([r[0] for r in db.execute(stmt).all() if r[0]])
+
     return FilterOptions(
         hrbps=distinct(Resource.hrbp),
         leaders=distinct(Resource.leader),

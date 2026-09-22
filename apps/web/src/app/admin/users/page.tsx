@@ -3,10 +3,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   getAdminUsers,
-  adminRegister,
+  adminCreateUser,
+  changeUserRole,
   deleteUser,
   type AdminUser,
 } from "@/lib/adminApi";
+import { getSessionUser } from "@/lib/session";
 
 const inputStyle = {
   width: "100%",
@@ -69,6 +71,13 @@ const modalStyle = {
   boxShadow: "8px 8px 24px #b0b8d8, -8px -8px 24px #ffffff",
 };
 
+const ROLE_OPTIONS = [
+  { value: "viewer", label: "Viewer", desc: "Read-only access" },
+  { value: "editor", label: "Editor", desc: "Add and edit data" },
+  { value: "admin", label: "Admin", desc: "Manage users & settings" },
+  { value: "owner", label: "Owner", desc: "Full control" },
+];
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +87,11 @@ export default function AdminUsersPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+
+  const me = getSessionUser();
+  const canWrite = me?.permissions.includes("user:write") ?? false;
+  const canDelete = me?.permissions.includes("user:delete") ?? false;
+  const isOwner = me?.role === "owner";
 
   async function load() {
     setLoading(true);
@@ -100,14 +114,23 @@ export default function AdminUsersPage() {
     setError("");
     setSaving(true);
     try {
-      await adminRegister(form.username, form.email, form.password, form.role);
+      await adminCreateUser(form.username, form.email, form.password, form.role);
       setShowForm(false);
       setForm({ username: "", email: "", password: "", role: "viewer" });
       await load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : "Failed to create user");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleRoleChange(userId: number, role: string) {
+    try {
+      await changeUserRole(userId, role);
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to change role");
     }
   }
 
@@ -127,9 +150,10 @@ export default function AdminUsersPage() {
 
   const rolePill = (role: string) => {
     const map: Record<string, string> = {
-      admin: "pill-red",
-      editor: "pill-purple",
-      viewer: "pill-blue",
+      owner: "pill-red",
+      admin: "pill-purple",
+      editor: "pill-blue",
+      viewer: "pill-gray",
     };
     return map[role] || "pill-gray";
   };
@@ -138,16 +162,28 @@ export default function AdminUsersPage() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>User Management</h2>
-          <p style={{ fontSize: 11, color: "#a0aec0" }}>{users.length} users registered</p>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Team & Roles</h2>
+          <p style={{ fontSize: 11, color: "#a0aec0" }}>{users.length} member{users.length === 1 ? "" : "s"}</p>
         </div>
-        <button onClick={() => { setShowForm(true); setError(""); }} style={btnPrimary}>
-          + Add User
-        </button>
+        {canWrite && (
+          <button onClick={() => { setShowForm(true); setError(""); }} style={btnPrimary}>
+            + Invite Member
+          </button>
+        )}
+      </div>
+
+      {/* Role legend */}
+      <div className="neo" style={{ padding: 14, marginBottom: 16, display: "flex", gap: 16, flexWrap: "wrap" }}>
+        {ROLE_OPTIONS.map((r) => (
+          <div key={r.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span className={`pill ${rolePill(r.value)}`}>{r.label}</span>
+            <span style={{ fontSize: 10, color: "#a0aec0" }}>{r.desc}</span>
+          </div>
+        ))}
       </div>
 
       <div className="neo" style={{ padding: 16, overflowX: "auto" }}>
-        <table className="neo-table" style={{ width: "100%", minWidth: 600 }}>
+        <table className="neo-table" style={{ width: "100%", minWidth: 640 }}>
           <thead>
             <tr>
               <th>ID</th>
@@ -162,31 +198,57 @@ export default function AdminUsersPage() {
             {loading ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#a0aec0" }}>
-                  Loading users...
+                  Loading members...
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#a0aec0" }}>
-                  No users found.
+                  No members found.
                 </td>
               </tr>
             ) : (
               users.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ fontWeight: 700, color: "#6366f1" }}>{u.id}</td>
-                  <td style={{ fontWeight: 600 }}>{u.username}</td>
+                  <td style={{ fontWeight: 700, color: "var(--brand-primary, #6366f1)" }}>{u.id}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {u.username}
+                    {u.id === me?.id && (
+                      <span style={{ fontSize: 9, color: "#a0aec0", marginLeft: 6 }}>(you)</span>
+                    )}
+                  </td>
                   <td>{u.email}</td>
                   <td>
-                    <span className={`pill ${rolePill(u.role)}`}>{u.role}</span>
+                    {canWrite && u.id !== me?.id && (u.role !== "owner" || isOwner) ? (
+                      <select
+                        value={u.role}
+                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                        style={{
+                          ...inputStyle,
+                          width: "auto",
+                          padding: "4px 8px",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {ROLE_OPTIONS.filter((r) => r.value !== "owner" || isOwner).map((r) => (
+                          <option key={r.value} value={r.value}>{r.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className={`pill ${rolePill(u.role)}`}>{u.role}</span>
+                    )}
                   </td>
                   <td style={{ fontSize: 11, color: "#a0aec0" }}>
                     {new Date(u.created_at).toLocaleDateString()}
                   </td>
                   <td>
-                    <button onClick={() => setDeleteId(u.id)} style={btnDangerSmall}>
-                      🗑️ Delete
-                    </button>
+                    {canDelete && u.id !== me?.id && (
+                      <button onClick={() => setDeleteId(u.id)} style={btnDangerSmall}>
+                        🗑️ Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -200,7 +262,7 @@ export default function AdminUsersPage() {
         <div style={overlayStyle} onClick={() => setShowForm(false)}>
           <div style={modalStyle} className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Add User</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Invite Member</h3>
               <button onClick={() => setShowForm(false)} style={{ ...btnGhost, fontSize: 18 }}>✕</button>
             </div>
 
@@ -231,6 +293,7 @@ export default function AdminUsersPage() {
                     value={form.username}
                     onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
                     required
+                    minLength={3}
                     style={inputStyle}
                   />
                 </div>
@@ -255,6 +318,7 @@ export default function AdminUsersPage() {
                     value={form.password}
                     onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                     required
+                    minLength={6}
                     style={inputStyle}
                   />
                 </div>
@@ -267,9 +331,11 @@ export default function AdminUsersPage() {
                     onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
                     style={{ ...inputStyle, cursor: "pointer" }}
                   >
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
-                    <option value="admin">Admin</option>
+                    {ROLE_OPTIONS.filter((r) => r.value !== "owner" || isOwner).map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label} — {r.desc}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -290,11 +356,11 @@ export default function AdminUsersPage() {
       {/* Delete Confirmation */}
       {deleteId !== null && (
         <div style={overlayStyle} onClick={() => setDeleteId(null)}>
-          <div style={{ ...modalStyle, maxWidth: 400, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...modalStyle, maxWidth: 400, textAlign: "center" }} className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Delete User?</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>Remove Member?</h3>
             <p style={{ fontSize: 12, color: "#a0aec0", marginBottom: 20 }}>
-              This action cannot be undone. The user will be permanently removed.
+              This action cannot be undone. The member will lose access immediately.
             </p>
             <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
               <button onClick={() => setDeleteId(null)} style={{ ...btnGhost, padding: "10px 16px" }}>
@@ -309,7 +375,7 @@ export default function AdminUsersPage() {
                   opacity: deleting ? 0.6 : 1,
                 }}
               >
-                {deleting ? "Deleting..." : "Delete"}
+                {deleting ? "Removing..." : "Remove"}
               </button>
             </div>
           </div>

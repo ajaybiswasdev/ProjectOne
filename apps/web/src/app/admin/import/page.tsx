@@ -1,13 +1,8 @@
 "use client";
 
 import { useState, useRef, type DragEvent, type ChangeEvent } from "react";
-import { adminImportCsv, adminExportCsv } from "@/lib/adminApi";
-
-type ImportResult = {
-  imported: number;
-  skipped: number;
-  errors: string[];
-};
+import { adminImportCsv, adminExportCsv, type ImportResult } from "@/lib/adminApi";
+import { getSessionUser } from "@/lib/session";
 
 export default function AdminImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -17,6 +12,10 @@ export default function AdminImportPage() {
   const [dragOver, setDragOver] = useState(false);
   const [exporting, setExporting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const perms = getSessionUser()?.permissions ?? [];
+  const canImport = perms.includes("data:import");
+  const canExport = perms.includes("data:export");
 
   function handleFile(f: File) {
     setFile(f);
@@ -53,9 +52,10 @@ export default function AdminImportPage() {
       setPreview([]);
     } catch (err: unknown) {
       setResult({
-        imported: 0,
-        skipped: 0,
+        created: 0,
+        updated: 0,
         errors: [err instanceof Error ? err.message : "Import failed"],
+        total_processed: 0,
       });
     } finally {
       setImporting(false);
@@ -100,6 +100,7 @@ export default function AdminImportPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="import-grid">
         {/* Upload Area */}
+        {canImport && (
         <div className="neo" style={{ padding: 24 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 12 }}>
             📤 Import CSV
@@ -199,8 +200,10 @@ export default function AdminImportPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Export Area */}
+        {canExport && (
         <div className="neo" style={{ padding: 24 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 12 }}>
             📥 Export Data
@@ -243,6 +246,7 @@ export default function AdminImportPage() {
             {exporting ? "Exporting..." : "⬇ Download CSV"}
           </button>
         </div>
+        )}
       </div>
 
       {/* Result */}
@@ -260,10 +264,10 @@ export default function AdminImportPage() {
           </h3>
           <div style={{ display: "flex", gap: 20, marginBottom: result.errors.length > 0 ? 8 : 0 }}>
             <span style={{ fontSize: 12, color: "#10b981", fontWeight: 700 }}>
-              Imported: {result.imported}
+              Created: {result.created}
             </span>
             <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 700 }}>
-              Skipped: {result.skipped}
+              Updated: {result.updated}
             </span>
           </div>
           {result.errors.length > 0 && (

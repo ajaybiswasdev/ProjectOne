@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useState, useEffect } from "react";
-import { isAdminLoggedIn } from "@/lib/adminApi";
+import { getSessionUser, isLoggedIn, applyBranding, clearSession, type SessionUser } from "@/lib/session";
 
 const navLinks = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
-  { href: "/admin/resources", label: "Resources", icon: "📦" },
-  { href: "/admin/import", label: "Import / Export", icon: "📥" },
-  { href: "/admin/users", label: "Users", icon: "👥" },
+  { href: "/admin/resources", label: "Resources", icon: "📦", permission: "resource:read" },
+  { href: "/admin/import", label: "Import / Export", icon: "📥", permission: "data:import" },
+  { href: "/admin/users", label: "Users", icon: "👥", permission: "user:read" },
+  { href: "/admin/settings", label: "Settings", icon: "⚙️", permission: "org:read" },
 ];
 
 const sidebarStyle = {
@@ -49,13 +50,14 @@ const logoIconStyle = {
   width: 36,
   height: 36,
   borderRadius: 10,
-  background: "#6366f1",
+  background: "var(--brand-primary, #6366f1)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   fontSize: 18,
   color: "#fff",
   boxShadow: "3px 3px 8px #b0b8d8, -3px -3px 8px #ffffff",
+  flexShrink: 0,
 };
 
 const navContainerStyle = {
@@ -84,7 +86,7 @@ const linkBaseStyle = {
 
 const linkActiveStyle = {
   ...linkBaseStyle,
-  color: "#6366f1",
+  color: "var(--brand-primary, #6366f1)",
   background: "rgba(99,102,241,.08)",
   boxShadow: "inset 3px 3px 8px #b0b8d8, inset -3px -3px 8px #ffffff",
 };
@@ -106,19 +108,38 @@ const logoutBtnStyle = {
   transition: "all .18s",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  editor: "Editor",
+  viewer: "Viewer",
+};
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authorized, setAuthorized] = useState(false);
+  const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
     if (pathname === "/admin/login") {
       setAuthorized(true);
       return;
     }
-    if (isAdminLoggedIn()) {
+    if (isLoggedIn()) {
+      const u = getSessionUser();
+      setUser(u);
+      applyBranding(u?.organization ?? null);
       setAuthorized(true);
+      // Refresh profile in background to keep branding/permissions fresh
+      import("@/lib/adminApi")
+        .then((m) => m.getMe())
+        .then((me) => {
+          setUser(me);
+          applyBranding(me.organization);
+        })
+        .catch(() => {});
     } else {
       router.push("/admin/login");
     }
@@ -131,9 +152,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (!authorized) return null;
 
   function handleLogout() {
-    localStorage.removeItem("admin_token");
+    clearSession();
     router.push("/admin/login");
   }
+
+  const visibleLinks = navLinks.filter(
+    (l) => !l.permission || (user?.permissions?.includes(l.permission) ?? true),
+  );
+
+  const orgName = user?.organization?.app_name || "Admin Panel";
+  const orgSub = user?.organization?.name || "Management Console";
+  const logoUrl = user?.organization?.logo_url;
 
   return (
     <>
@@ -170,16 +199,23 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       >
         <div style={headerStyle}>
           <div style={logoStyle}>
-            <div style={logoIconStyle}>⚙</div>
+            <div style={logoIconStyle}>
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />
+              ) : (
+                "⚙"
+              )}
+            </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#1e293b" }}>Admin Panel</div>
-              <div style={{ fontSize: 10, color: "#a0aec0" }}>Management Console</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#1e293b" }}>{orgName}</div>
+              <div style={{ fontSize: 10, color: "#a0aec0" }}>{orgSub}</div>
             </div>
           </div>
         </div>
 
         <nav style={navContainerStyle}>
-          {navLinks.map((link) => {
+          {visibleLinks.map((link) => {
             const isActive =
               link.href === "/admin"
                 ? pathname === "/admin"
@@ -246,10 +282,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         >
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>
-              Admin Panel
+              {orgName}
             </h1>
             <p style={{ fontSize: 11, color: "#a0aec0" }}>
-              Bench Management · Administrative Console
+              {orgSub} · {user?.organization?.industry ?? "professional"}
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -259,12 +295,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 borderRadius: 20,
                 fontSize: 11,
                 fontWeight: 600,
-                color: "#6366f1",
+                color: "var(--brand-primary, #6366f1)",
                 background: "#e8eaf6",
                 boxShadow: "2px 2px 6px #b0b8d8, -2px -2px 6px #ffffff",
               }}
             >
-              👤 Admin
+              👤 {user?.username ?? "User"} · {ROLE_LABELS[user?.role ?? ""] ?? user?.role}
             </div>
             <button
               onClick={handleLogout}

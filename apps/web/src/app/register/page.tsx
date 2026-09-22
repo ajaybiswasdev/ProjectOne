@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { publicRegister } from "@/lib/adminApi";
 
+const INDUSTRIES = [
+  { value: "professional", label: "Professional Services", desc: "Consulting, staffing, workforce" },
+  { value: "healthcare", label: "Healthcare", desc: "Hospitals, clinics, care teams" },
+  { value: "education", label: "Education", desc: "Schools, universities, cohorts" },
+];
+
 export default function RegisterPage() {
   const router = useRouter();
+  const [orgName, setOrgName] = useState("");
+  const [industry, setIndustry] = useState("professional");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +35,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await publicRegister(username, email, password);
+      await publicRegister(username, email, password, orgName, industry);
       router.push("/admin/login");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -73,14 +81,14 @@ export default function RegisterPage() {
       <div
         style={{
           width: "100%",
-          maxWidth: 420,
+          maxWidth: 460,
           padding: 40,
           borderRadius: 20,
           background: "#e8eaf6",
           boxShadow: "6px 6px 16px #b0b8d8, -6px -6px 16px #ffffff",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div
             style={{
               width: 56,
@@ -99,9 +107,9 @@ export default function RegisterPage() {
             ✏️
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1e293b", marginBottom: 4 }}>
-            Create Account
+            Create your workspace
           </h1>
-          <p style={{ fontSize: 13, color: "#a0aec0" }}>Register to get started</p>
+          <p style={{ fontSize: 13, color: "#a0aec0" }}>Set up your organization and admin account</p>
         </div>
 
         {error && (
@@ -121,7 +129,50 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Organization Name</label>
+            <input
+              type="text"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              required
+              minLength={2}
+              placeholder="Acme Corp"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Industry</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              {INDUSTRIES.map((ind) => (
+                <button
+                  key={ind.value}
+                  type="button"
+                  onClick={() => setIndustry(ind.value)}
+                  style={{
+                    padding: "10px 8px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: industry === ind.value ? "#6366f1" : "#e8eaf6",
+                    color: industry === ind.value ? "#fff" : "#1e293b",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow:
+                      industry === ind.value
+                        ? "inset 2px 2px 6px rgba(0,0,0,.2)"
+                        : "3px 3px 8px #b0b8d8, -3px -3px 8px #ffffff",
+                    transition: "all .15s",
+                  }}
+                >
+                  {ind.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Username</label>
             <input
               type="text"
@@ -133,7 +184,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Email</label>
             <input
               type="email"
@@ -144,7 +195,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Password</label>
             <input
               type="password"
@@ -185,7 +236,7 @@ export default function RegisterPage() {
               transition: "opacity .18s",
             }}
           >
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? "Creating workspace..." : "Create Workspace"}
           </button>
         </form>
 

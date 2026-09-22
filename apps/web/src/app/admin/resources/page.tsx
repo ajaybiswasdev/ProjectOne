@@ -11,6 +11,7 @@ import {
   adminDeleteResource,
   type AdminResource,
 } from "@/lib/adminApi";
+import { getSessionUser } from "@/lib/session";
 
 const PAGE_SIZE = 25;
 
@@ -110,6 +111,10 @@ export default function AdminResourcesPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const perms = getSessionUser()?.permissions ?? [];
+  const canWrite = perms.includes("resource:write");
+  const canDelete = perms.includes("resource:delete");
 
   async function load() {
     setLoading(true);
@@ -213,9 +218,11 @@ export default function AdminResourcesPage() {
           <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Resource Management</h2>
           <p style={{ fontSize: 11, color: "#a0aec0" }}>{filtered.length} resources found</p>
         </div>
-        <button onClick={openAdd} style={btnPrimary}>
-          + Add Resource
-        </button>
+        {canWrite && (
+          <button onClick={openAdd} style={btnPrimary}>
+            + Add Resource
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -288,12 +295,16 @@ export default function AdminResourcesPage() {
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={() => openEdit(r)} style={btnGhost}>
-                        ✏️ Edit
-                      </button>
-                      <button onClick={() => setDeleteId(r.id)} style={btnDangerSmall}>
-                        🗑️
-                      </button>
+                      {canWrite && (
+                        <button onClick={() => openEdit(r)} style={btnGhost}>
+                          ✏️ Edit
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => setDeleteId(r.id)} style={btnDangerSmall}>
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

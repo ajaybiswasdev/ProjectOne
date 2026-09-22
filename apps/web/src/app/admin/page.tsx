@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAdminSummary, type AdminUser } from "@/lib/adminApi";
+import { getAdminSummary } from "@/lib/adminApi";
 import { getResources, type Resource } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 
 const statCardStyle = {
   padding: "16px 20px",
@@ -123,28 +124,31 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="neo" style={{ padding: 20, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 16 }}>
-          Quick Actions
-        </h2>
-        <div className="admin-actions-row" style={{ display: "flex", gap: 12 }}>
-          <Link href="/admin/resources" style={actionBtnStyle("#6366f1")} className="admin-action-card">
-            <span style={{ fontSize: 28 }}>➕</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>Add Resource</span>
-            <span style={{ fontSize: 10, color: "#a0aec0" }}>Create new resource entry</span>
-          </Link>
-          <Link href="/admin/import" style={actionBtnStyle("#10b981")} className="admin-action-card">
-            <span style={{ fontSize: 28 }}>📥</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>Import Data</span>
-            <span style={{ fontSize: 10, color: "#a0aec0" }}>Upload CSV to import</span>
-          </Link>
-          <Link href="/admin/users" style={actionBtnStyle("#f59e0b")} className="admin-action-card">
-            <span style={{ fontSize: 28 }}>👤</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>Manage Users</span>
-            <span style={{ fontSize: 10, color: "#a0aec0" }}>Add or remove users</span>
-          </Link>
-        </div>
-      </div>
+      {(() => {
+        const perms = getSessionUser()?.permissions ?? [];
+        const actions = [
+          { href: "/admin/resources", icon: "➕", title: "Add Resource", desc: "Create new resource entry", perm: "resource:write", color: "#6366f1" },
+          { href: "/admin/import", icon: "📥", title: "Import Data", desc: "Upload CSV to import", perm: "data:import", color: "#10b981" },
+          { href: "/admin/users", icon: "👤", title: "Manage Users", desc: "Add or remove users", perm: "user:read", color: "#f59e0b" },
+        ].filter((a) => perms.includes(a.perm));
+        if (actions.length === 0) return null;
+        return (
+          <div className="neo" style={{ padding: 20, marginBottom: 20 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", marginBottom: 16 }}>
+              Quick Actions
+            </h2>
+            <div className="admin-actions-row" style={{ display: "flex", gap: 12 }}>
+              {actions.map((a) => (
+                <Link key={a.href} href={a.href} style={actionBtnStyle(a.color)} className="admin-action-card">
+                  <span style={{ fontSize: 28 }}>{a.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>{a.title}</span>
+                  <span style={{ fontSize: 10, color: "#a0aec0" }}>{a.desc}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Recent Resources */}
       <div className="neo" style={{ padding: 20 }}>

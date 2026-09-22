@@ -21,6 +21,11 @@
   --p-coral: #f4a094;
   --p-teal: #80cece;
   --p-cream: #f8e6a8;
+
+  /* White-label branding (overridden at runtime by applyBranding) */
+  --brand-primary: #6366f1;
+  --brand-accent: #10b981;
+  --brand-app-name: "Dashboard";
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

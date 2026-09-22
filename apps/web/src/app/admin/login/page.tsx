@@ -17,8 +17,7 @@ export default function AdminLoginPage() {
     setError("");
     setLoading(true);
     try {
-      const data = await adminLogin(username, password);
-      localStorage.setItem("admin_token", data.access_token);
+      await adminLogin(username, password);
       router.push("/admin");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
