@@ -104,7 +104,10 @@ async function apiFetch<T>(path: string, params?: Record<string, string>, retrie
         if (response.status === 401 && typeof window !== "undefined") {
           localStorage.removeItem("admin_token");
           localStorage.removeItem("admin_user");
-          window.location.href = "/admin/login";
+          // Soft redirect — don't interrupt in-flight React work
+          if (!window.location.pathname.startsWith("/admin/login")) {
+            window.location.replace("/admin/login");
+          }
         }
         throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
       }

@@ -6,6 +6,7 @@ import {
 } from "chart.js";
 import { Doughnut, Bar } from "react-chartjs-2";
 import type { PipelineSummary, Resource } from "@/lib/api";
+import { getPipeline, getResources, getFilters } from "@/lib/api";
 import { DownloadButton, pipelineExport } from "@/components/DownloadButton";
 
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
@@ -44,24 +45,23 @@ export default function PipelinePage() {
   const [leader, setLeader] = useState("");
   const [hrbps, setHrbps] = useState<string[]>([]);
   const [leaders, setLeaders] = useState<string[]>([]);
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
   const fetchData = (h?: string, l?: string) => {
     const p: Record<string, string> = {};
     if (h) p.hrbp = h;
     if (l) p.leader = l;
-    const qs = new URLSearchParams(p).toString();
-    const url = qs ? `?${qs}` : "";
-    Promise.all([
-      fetch(`${base}/api/v1/pipeline${url}`).then((r) => r.json()),
-      fetch(`${base}/api/v1/resources${url}`).then((r) => r.json()),
-    ]).then(([p, r]) => { setPipeline(p); setResources(r); });
+    Promise.all([getPipeline(p), getResources(p)])
+      .then(([pipe, res]) => { setPipeline(pipe); setResources(res); })
+      .catch(() => {});
   };
 
   useEffect(() => {
     fetchData();
-    fetch(`${base}/api/v1/filters`).then((r) => r.json()).then((f) => { setHrbps(f.hrbps); setLeaders(f.leaders); });
-  }, [base]);
+    getFilters()
+      .then((f) => { setHrbps(f.hrbps); setLeaders(f.leaders); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyFilter = (h: string, l: string) => { setHrbp(h); setLeader(l); fetchData(h, l); };
   const clearFilter = () => { setHrbp(""); setLeader(""); fetchData(); };

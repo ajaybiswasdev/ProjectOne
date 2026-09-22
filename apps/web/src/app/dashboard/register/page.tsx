@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Resource, FilterOptions } from "@/lib/api";
+import { getResources, getFilters } from "@/lib/api";
 import { DownloadButton, registerExport } from "@/components/DownloadButton";
 
 export default function RegisterPage() {
@@ -11,21 +12,23 @@ export default function RegisterPage() {
   const [leader, setLeader] = useState("");
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState("all");
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
   const fetchData = (h?: string, l?: string) => {
     const p: Record<string, string> = {};
     if (h) p.hrbp = h;
     if (l) p.leader = l;
-    const qs = new URLSearchParams(p).toString();
-    const url = qs ? `?${qs}` : "";
-    fetch(`${base}/api/v1/resources${url}`).then((r) => r.json()).then(setAllResources);
+    getResources(p)
+      .then(setAllResources)
+      .catch(() => {});
   };
 
   useEffect(() => {
     fetchData();
-    fetch(`${base}/api/v1/filters`).then((r) => r.json()).then(setFilters);
-  }, [base]);
+    getFilters()
+      .then(setFilters)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyFilter = (h: string, l: string) => { setHrbp(h); setLeader(l); fetchData(h, l); };
   const clearFilter = () => { setHrbp(""); setLeader(""); fetchData(); };
