@@ -11,11 +11,33 @@ const INDUSTRIES = [
   { value: "education", label: "Education", desc: "Schools, universities, cohorts" },
 ];
 
+// Local fallback so the preview never depends on a live API call
+const ROLE_FALLBACK: Record<string, RoleOption[]> = {
+  professional: [
+    { value: "owner", label: "Owner", desc: "Full control of the workspace" },
+    { value: "admin", label: "Admin", desc: "Manage users & settings" },
+    { value: "editor", label: "Editor", desc: "Add and edit workforce data" },
+    { value: "viewer", label: "Viewer", desc: "Read-only access" },
+  ],
+  healthcare: [
+    { value: "owner", label: "Owner", desc: "Full control of the workspace" },
+    { value: "admin", label: "Admin", desc: "Manage clinical team & settings" },
+    { value: "clinical_editor", label: "Clinical Editor", desc: "Update staffing & bench records" },
+    { value: "observer", label: "Observer", desc: "Read-only clinical access (no export)" },
+  ],
+  education: [
+    { value: "owner", label: "Owner", desc: "Full control of the workspace" },
+    { value: "admin", label: "Admin", desc: "Manage faculty & settings" },
+    { value: "faculty_editor", label: "Faculty Editor", desc: "Update cohort & placement data" },
+    { value: "viewer", label: "Viewer", desc: "Read-only academic access" },
+  ],
+};
+
 export default function RegisterPage() {
   const router = useRouter();
   const [orgName, setOrgName] = useState("");
   const [industry, setIndustry] = useState("professional");
-  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>(ROLE_FALLBACK.professional);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,13 +46,16 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Instant industry-specific fallback while (or if) the API call runs
+    setRoles(ROLE_FALLBACK[industry] ?? ROLE_FALLBACK.professional);
+
     let cancelled = false;
     getPublicRoles(industry)
       .then((r) => {
-        if (!cancelled) setRoles(r.roles);
+        if (!cancelled && r.roles.length > 0) setRoles(r.roles);
       })
       .catch(() => {
-        if (!cancelled) setRoles([]);
+        /* keep local fallback */
       });
     return () => {
       cancelled = true;
