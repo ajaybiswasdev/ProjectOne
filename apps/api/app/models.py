@@ -33,4 +33,4 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(256))
     role: Mapped[str] = mapped_column(String(20), default="admin")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[str] = mapped_column(String(30), default="")
+    created_at: Mapped[str] = mapped_column(String(60), default="")

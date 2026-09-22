@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
@@ -79,6 +80,16 @@ def auto_setup():
     except Exception:
         logger.exception("Table creation failed")
         return
+
+    # Widen columns that may be too short from earlier schemas
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ALTER COLUMN created_at TYPE VARCHAR(60)"))
+            conn.execute(text("ALTER TABLE users ALTER COLUMN hashed_password TYPE VARCHAR(256)"))
+            conn.commit()
+        logger.info("User column widths verified")
+    except Exception:
+        logger.info("User column widths already correct or alter failed (non-fatal)")
 
     # Seed resources
     try:
