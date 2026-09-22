@@ -26,11 +26,6 @@ const sidebarStyle = {
   transition: "transform .28s ease",
 };
 
-const mobileSidebarStyle = {
-  ...sidebarStyle,
-  transform: "translateX(-100%)",
-};
-
 const overlayStyle = {
   position: "fixed" as const,
   inset: 0,
@@ -165,8 +160,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* Sidebar */}
       <aside
-        className="admin-sidebar"
-        style={sidebarOpen ? sidebarStyle : { ...sidebarStyle, transform: "translateX(-100%)" }}
+        className={`admin-sidebar${sidebarOpen ? " open" : ""}`}
+        style={sidebarStyle}
       >
         <div style={headerStyle}>
           <div style={logoStyle}>
@@ -295,7 +290,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           display: none !important;
         }
         .admin-sidebar {
-          transform: translateX(-100%);
+          transform: translateX(0) !important;
         }
         .admin-main {
           margin-left: 240px;
@@ -305,6 +300,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             display: flex !important;
           }
           .admin-sidebar {
+            transform: translateX(-100%) !important;
+          }
+          .admin-sidebar.open {
             transform: translateX(0) !important;
           }
           .admin-main {
