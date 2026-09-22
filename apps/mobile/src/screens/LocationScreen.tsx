@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { API_BASE_URL } from '../config';
+import { authFetch } from '../authFetch';
 
 const LOC_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4'];
 const EXP_COLORS = ['#22c55e', '#3b82f6', '#8b5cf6', '#eab308', '#f97316', '#ef4444', '#6366f1'];
@@ -77,11 +78,11 @@ export default function LocationScreen() {
       const suffix = qs ? `?${qs}` : '';
 
       const [summaryRes, locRes, expRes, desigRes, filterRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/summary${suffix}`),
-        fetch(`${API_BASE_URL}/api/v1/locations${suffix}`),
-        fetch(`${API_BASE_URL}/api/v1/experience${suffix}`),
-        fetch(`${API_BASE_URL}/api/v1/designations${suffix}`),
-        fetch(`${API_BASE_URL}/api/v1/filters`),
+        authFetch(`${API_BASE_URL}/api/v1/summary${suffix}`),
+        authFetch(`${API_BASE_URL}/api/v1/locations${suffix}`),
+        authFetch(`${API_BASE_URL}/api/v1/experience${suffix}`),
+        authFetch(`${API_BASE_URL}/api/v1/designations${suffix}`),
+        authFetch(`${API_BASE_URL}/api/v1/filters`),
       ]);
 
       setSummary(await summaryRes.json());

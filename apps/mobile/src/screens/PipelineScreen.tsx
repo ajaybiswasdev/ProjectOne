@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { API_BASE_URL } from '../config';
+import { authFetch } from '../authFetch';
 
 interface PipelineSummary {
   ifb_selected: number;
@@ -82,9 +83,9 @@ export default function PipelineScreen() {
       const qs = params.toString() ? `?${params.toString()}` : '';
 
       const [pipelineRes, resourcesRes, filtersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/pipeline${qs}`),
-        fetch(`${API_BASE_URL}/api/v1/resources${qs}`),
-        fetch(`${API_BASE_URL}/api/v1/filters`),
+        authFetch(`${API_BASE_URL}/api/v1/pipeline${qs}`),
+        authFetch(`${API_BASE_URL}/api/v1/resources${qs}`),
+        authFetch(`${API_BASE_URL}/api/v1/filters`),
       ]);
       const [pipelineData, resourcesData, filtersData] = await Promise.all([
         pipelineRes.json(),

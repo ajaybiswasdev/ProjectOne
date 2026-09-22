@@ -1,4 +1,5 @@
 import { API_BASE_URL, API_TIMEOUT_MS } from "./config";
+import { authHeaders } from "./authFetch";
 
 // ─── Types (matches apps/api/schemas.py exactly) ─────────────────────────────
 
@@ -122,10 +123,14 @@ export class BenchApiClient {
       try {
         const response = await fetch(url, {
           signal: controller.signal,
-          headers: { Accept: "application/json" },
+          headers: authHeaders(),
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            const { clearSession } = await import("./session");
+            await clearSession();
+          }
           throw new ApiError(response.status, `API error: ${response.status}`);
         }
 

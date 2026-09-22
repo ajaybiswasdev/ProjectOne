@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { API_BASE_URL } from '../config';
+import { authFetch } from '../authFetch';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -120,9 +121,9 @@ export default function SkillsScreen() {
       setError(null);
 
       const [skillsRes, resourcesRes, filtersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/skills`),
-        fetch(`${API_BASE_URL}/api/v1/resources`),
-        fetch(`${API_BASE_URL}/api/v1/filters`),
+        authFetch(`${API_BASE_URL}/api/v1/skills`),
+        authFetch(`${API_BASE_URL}/api/v1/resources`),
+        authFetch(`${API_BASE_URL}/api/v1/filters`),
       ]);
 
       if (!skillsRes.ok || !resourcesRes.ok || !filtersRes.ok) {

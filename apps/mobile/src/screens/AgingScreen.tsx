@@ -9,6 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { API_BASE_URL } from '../config';
+import { authFetch } from '../authFetch';
 
 interface AgingBucketSummary {
   bucket: string;
@@ -93,10 +94,10 @@ export default function AgingScreen() {
     try {
       const qs = buildParams();
       const [summaryRes, bucketsRes, deptRes, filtersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/summary${qs}`),
-        fetch(`${API_BASE_URL}/api/v1/aging/summary${qs}`),
-        fetch(`${API_BASE_URL}/api/v1/aging${qs}`),
-        fetch(`${API_BASE_URL}/api/v1/filters`),
+        authFetch(`${API_BASE_URL}/api/v1/summary${qs}`),
+        authFetch(`${API_BASE_URL}/api/v1/aging/summary${qs}`),
+        authFetch(`${API_BASE_URL}/api/v1/aging${qs}`),
+        authFetch(`${API_BASE_URL}/api/v1/filters`),
       ]);
       const [summaryData, bucketsData, deptData, filtersData] = await Promise.all([
         summaryRes.json(),
@@ -248,7 +249,7 @@ export default function AgingScreen() {
                     {row.department}
                   </Text>
                   {['0-30', '31-60', '61-90', '91-120', '121-180', '181+'].map((b) => (
-                    <View key={b} style={[styles.tableCell, styles.colCol, styles.heatCell]}>
+                    <View key={b} style={[styles.colCol, styles.heatCell]}>
                       <View
                         style={[
                           styles.heatDot,
@@ -262,7 +263,7 @@ export default function AgingScreen() {
                     </View>
                   ))}
                   <Text style={[styles.tableCell, styles.totalCol, styles.totalValue]}>{row.total}</Text>
-                  <View style={[styles.tableCell, styles.riskCol]}>
+                  <View style={[styles.riskCol]}>
                     <View style={[styles.riskPill, { backgroundColor: riskStyle.bg }]}>
                       <Text style={[styles.riskPillText, { color: riskStyle.text }]}>{row.risk}</Text>
                     </View>

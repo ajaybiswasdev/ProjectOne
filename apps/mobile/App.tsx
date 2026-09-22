@@ -5,7 +5,9 @@ import {
 
 import { BenchApiClient, type Resource, type Summary, type SkillCount, type AgingBucketSummary, type AgingDepartmentRow, type PipelineSummary, type LocationCount, type ExperienceBucket, type DesignationCount, ApiError } from "./src/apiClient";
 import { API_BASE_URL, APP_CONFIG } from "./src/config";
+import { clearSession, getSessionUser, loadSession, subscribeAuth, type SessionUser } from "./src/session";
 
+import LoginScreen from "./src/screens/LoginScreen";
 import { LandingScreen } from "./src/screens/LandingScreen";
 import OverviewScreen from "./src/screens/OverviewScreen";
 import AgingScreen from "./src/screens/AgingScreen";
@@ -45,6 +47,9 @@ const TAB_SUBTITLES: Record<TabKey, string> = {
 
 export default function App() {
   const api = useMemo(() => new BenchApiClient(API_BASE_URL), []);
+  const [authReady, setAuthReady] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [screen, setScreen] = useState<"landing" | "dashboard">("landing");
   const [tab, setTab] = useState<TabKey>("overview");
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +69,11 @@ export default function App() {
       setResources(r);
       setError(null);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setLoggedIn(false);
+        setSessionUser(null);
+        return;
+      }
       if (err instanceof ApiError) {
         setError(`Server error (${err.status}). Please try again.`);
       } else if (err instanceof Error && err.name === "AbortError") {
@@ -78,8 +88,38 @@ export default function App() {
   }, [api]);
 
   useEffect(() => {
-    fetchData();
+    let cancelled = false;
+    loadSession().then((ok) => {
+      if (cancelled) return;
+      setLoggedIn(ok);
+      setSessionUser(getSessionUser());
+      setAuthReady(true);
+      if (!ok) setLoading(false);
+    });
+    const unsub = subscribeAuth((next) => {
+      setLoggedIn(next);
+      setSessionUser(next ? getSessionUser() : null);
+      if (next) {
+        setLoading(true);
+        setScreen("landing");
+        setTab("overview");
+        fetchData();
+      } else {
+        setSummary(null);
+        setResources([]);
+        setLoading(false);
+        setScreen("landing");
+      }
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [fetchData]);
+
+  useEffect(() => {
+    if (loggedIn) fetchData();
+  }, [loggedIn, fetchData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -91,6 +131,23 @@ export default function App() {
     setScreen("dashboard");
   };
 
+  const handleLogout = async () => {
+    await clearSession();
+  };
+
+  if (!authReady) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator size="large" color="#5c6bc0" />
+        <Text style={styles.loadingText}>Starting {APP_CONFIG.name}…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!loggedIn) {
+    return <LoginScreen />;
+  }
+
   if (error && !loading) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -99,6 +156,9 @@ export default function App() {
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchData} accessibilityLabel="Retry loading data">
           <Text style={styles.retryBtnText}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} accessibilityLabel="Sign out">
+          <Text style={styles.logoutBtnText}>Sign Out</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -121,6 +181,15 @@ export default function App() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <LandingScreen summary={summary} onOpen={openTab} />
+        <View style={styles.authBar}>
+          <Text style={styles.authBarText} numberOfLines={1}>
+            👤 {sessionUser?.username || "Signed in"}
+            {sessionUser?.role ? ` · ${sessionUser.role}` : ""}
+          </Text>
+          <TouchableOpacity onPress={handleLogout} accessibilityLabel="Sign out" accessibilityRole="button">
+            <Text style={styles.authBarLogout}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     );
   }
@@ -147,6 +216,14 @@ export default function App() {
             accessibilityRole="button"
           >
             <Text style={styles.homeBtnText}>🏠 Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.homeBtn}
+            onPress={handleLogout}
+            accessibilityLabel="Sign out"
+            accessibilityRole="button"
+          >
+            <Text style={styles.homeBtnText}>⎋ Out</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -207,6 +284,18 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 13, color: "#718096", textAlign: "center", marginBottom: 24, lineHeight: 20 },
   retryBtn: { backgroundColor: "#1B3A8A", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10 },
   retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  logoutBtn: { marginTop: 12, backgroundColor: "transparent", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: "#b0b8d8" },
+  logoutBtnText: { color: "#64748b", fontSize: 13, fontWeight: "700" },
+  authBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  authBarText: { flex: 1, fontSize: 12, color: "#64748b", fontWeight: "600" },
+  authBarLogout: { fontSize: 12, color: "#e53935", fontWeight: "700" },
 
   dashHeader: {
     flexDirection: "row",

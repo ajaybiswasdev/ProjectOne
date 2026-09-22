@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { API_BASE_URL } from '../config';
+import { authFetch } from '../authFetch';
 
 type Resource = {
   id: number;
@@ -68,8 +69,8 @@ export default function RegisterScreen() {
   const fetchData = useCallback(async () => {
     try {
       const [resRes, filterRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/resources`),
-        fetch(`${API_BASE_URL}/api/v1/filters`),
+        authFetch(`${API_BASE_URL}/api/v1/resources`),
+        authFetch(`${API_BASE_URL}/api/v1/filters`),
       ]);
       const resData: Resource[] = await resRes.json();
       const filterData: FilterOptions = await filterRes.json();

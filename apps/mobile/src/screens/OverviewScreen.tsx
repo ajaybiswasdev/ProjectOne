@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { API_BASE_URL } from '../config';
+import { authFetch } from '../authFetch';
 
 interface Resource {
   id: number;
@@ -55,8 +56,8 @@ export default function OverviewScreen() {
   const fetchData = async () => {
     try {
       const [summaryRes, resourcesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/summary`),
-        fetch(`${API_BASE_URL}/api/v1/resources`),
+        authFetch(`${API_BASE_URL}/api/v1/summary`),
+        authFetch(`${API_BASE_URL}/api/v1/resources`),
       ]);
       const [summaryData, resourcesData] = await Promise.all([
         summaryRes.json(),
