@@ -6,7 +6,10 @@ import {
   adminCreateUser,
   changeUserRole,
   deleteUser,
+  createInvite,
+  adminResetLink,
   type AdminUser,
+  type InviteLink,
 } from "@/lib/adminApi";
 import { getSessionUser } from "@/lib/session";
 
@@ -87,6 +90,9 @@ export default function AdminUsersPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [inviteMode, setInviteMode] = useState<"password" | "link">("password");
+  const [inviteLink, setInviteLink] = useState<InviteLink | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   const me = getSessionUser();
   const canWrite = me?.permissions.includes("user:write") ?? false;
@@ -114,14 +120,42 @@ export default function AdminUsersPage() {
     setError("");
     setSaving(true);
     try {
-      await adminCreateUser(form.username, form.email, form.password, form.role);
-      setShowForm(false);
-      setForm({ username: "", email: "", password: "", role: "viewer" });
-      await load();
+      if (inviteMode === "link") {
+        const link = await createInvite(form.email, form.role);
+        setInviteLink(link);
+        setShowForm(false);
+        setForm({ username: "", email: "", password: "", role: "viewer" });
+      } else {
+        await adminCreateUser(form.username, form.email, form.password, form.role);
+        setShowForm(false);
+        setForm({ username: "", email: "", password: "", role: "viewer" });
+        await load();
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create user");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleResetLink(userId: number) {
+    setLinkBusy(true);
+    try {
+      const link = await adminResetLink(userId);
+      setInviteLink({ ...link, token: link.token });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to create reset link");
+    } finally {
+      setLinkBusy(false);
+    }
+  }
+
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Copied to clipboard");
+    } catch {
+      prompt("Copy:", text);
     }
   }
 
@@ -191,7 +225,7 @@ export default function AdminUsersPage() {
               <th>Email</th>
               <th>Role</th>
               <th>Created</th>
-              <th>Actions</th>
+              <th style={{ minWidth: 160 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -244,11 +278,18 @@ export default function AdminUsersPage() {
                     {new Date(u.created_at).toLocaleDateString()}
                   </td>
                   <td>
-                    {canDelete && u.id !== me?.id && (
-                      <button onClick={() => setDeleteId(u.id)} style={btnDangerSmall}>
-                        🗑️ Delete
-                      </button>
-                    )}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {canWrite && (
+                        <button onClick={() => handleResetLink(u.id)} disabled={linkBusy} style={btnGhost}>
+                          🔑 Reset link
+                        </button>
+                      )}
+                      {canDelete && u.id !== me?.id && (
+                        <button onClick={() => setDeleteId(u.id)} style={btnDangerSmall}>
+                          🗑️ Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -264,6 +305,35 @@ export default function AdminUsersPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Invite Member</h3>
               <button onClick={() => setShowForm(false)} style={{ ...btnGhost, fontSize: 18 }}>✕</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={() => setInviteMode("link")}
+                style={{
+                  ...btnGhost,
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  background: inviteMode === "link" ? "rgba(99,102,241,.12)" : "transparent",
+                  color: inviteMode === "link" ? "#6366f1" : "#a0aec0",
+                }}
+              >
+                Invite link
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteMode("password")}
+                style={{
+                  ...btnGhost,
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  background: inviteMode === "password" ? "rgba(99,102,241,.12)" : "transparent",
+                  color: inviteMode === "password" ? "#6366f1" : "#a0aec0",
+                }}
+              >
+                Set password now
+              </button>
             </div>
 
             {error && (
@@ -284,19 +354,21 @@ export default function AdminUsersPage() {
 
             <form onSubmit={handleCreate}>
               <div style={{ display: "grid", gap: 12 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#a0aec0", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.6 }}>
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={form.username}
-                    onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
-                    required
-                    minLength={3}
-                    style={inputStyle}
-                  />
-                </div>
+                {inviteMode === "password" && (
+                  <div>
+                    <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#a0aec0", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={form.username}
+                      onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
+                      required
+                      minLength={3}
+                      style={inputStyle}
+                    />
+                  </div>
+                )}
                 <div>
                   <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#a0aec0", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.6 }}>
                     Email
@@ -309,19 +381,21 @@ export default function AdminUsersPage() {
                     style={inputStyle}
                   />
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#a0aec0", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.6 }}>
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                    required
-                    minLength={6}
-                    style={inputStyle}
-                  />
-                </div>
+                {inviteMode === "password" && (
+                  <div>
+                    <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#a0aec0", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.6 }}>
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                      required
+                      minLength={6}
+                      style={inputStyle}
+                    />
+                  </div>
+                )}
                 <div>
                   <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#a0aec0", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.6 }}>
                     Role
@@ -338,6 +412,11 @@ export default function AdminUsersPage() {
                     ))}
                   </select>
                 </div>
+                {inviteMode === "link" && (
+                  <p style={{ fontSize: 11, color: "#a0aec0", margin: 0 }}>
+                    We&apos;ll generate a shareable invite link (valid 7 days). Send it to the member yourself — no email is configured yet.
+                  </p>
+                )}
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -345,10 +424,47 @@ export default function AdminUsersPage() {
                   Cancel
                 </button>
                 <button type="submit" disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>
-                  {saving ? "Creating..." : "Create User"}
+                  {saving ? "Creating..." : inviteMode === "link" ? "Create invite link" : "Create User"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Shared invite / reset link modal */}
+      {inviteLink && (
+        <div style={overlayStyle} onClick={() => setInviteLink(null)}>
+          <div style={modalStyle} className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Share this link</h3>
+              <button onClick={() => setInviteLink(null)} style={{ ...btnGhost, fontSize: 18 }}>✕</button>
+            </div>
+            <p style={{ fontSize: 12, color: "#a0aec0", marginBottom: 12 }}>
+              Valid until {new Date(inviteLink.expires_at).toLocaleString()}. Copy and send it securely.
+            </p>
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "#e8eaf6",
+                boxShadow: "inset 2px 2px 6px #b0b8d8, inset -2px -2px 6px #ffffff",
+                fontSize: 12,
+                wordBreak: "break-all",
+                color: "#1e293b",
+                marginBottom: 16,
+              }}
+            >
+              {inviteLink.link}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setInviteLink(null)} style={{ ...btnGhost, padding: "10px 16px" }}>
+                Close
+              </button>
+              <button onClick={() => copyText(inviteLink.link)} style={btnPrimary}>
+                Copy link
+              </button>
+            </div>
           </div>
         </div>
       )}

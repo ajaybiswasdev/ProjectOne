@@ -97,6 +97,8 @@ def auto_setup():
         "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS industry VARCHAR(40) DEFAULT 'professional'",
         "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
         "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS created_at VARCHAR(60) DEFAULT ''",
+        "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free'",
+        "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS rate_limit INTEGER DEFAULT 120",
     ]
     try:
         with engine.connect() as conn:

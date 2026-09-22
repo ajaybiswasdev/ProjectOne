@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { type ReactNode, useEffect, useState } from "react";
+import { applyBranding, getSessionUser, isLoggedIn } from "@/lib/session";
 
 const tabs = [
   { href: "/dashboard/overview", label: "Overview", icon: "📊" },
@@ -15,6 +16,35 @@ const tabs = [
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isLoggedIn()) {
+      router.replace("/admin/login");
+      return;
+    }
+    applyBranding(getSessionUser()?.organization ?? null);
+    setAuthorized(true);
+  }, [router]);
+
+  if (!authorized) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#a0aec0",
+          fontSize: 13,
+        }}
+      >
+        Loading dashboard...
+      </div>
+    );
+  }
 
   return (
     <>
@@ -51,9 +81,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </nav>
       </div>
 
-      <div className="dash-content">
-        {children}
-      </div>
+      <div className="dash-content">{children}</div>
 
       <div className="neo footer-bar">
         <span>🏖️ Bench Management Dashboard · Data &amp; AI Practice</span>

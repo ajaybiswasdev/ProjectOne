@@ -57,6 +57,63 @@ export type OrgSettings = {
   settings_json: Record<string, unknown>;
 };
 
+export type PlanUsage = {
+  plan: string;
+  plan_name: string;
+  max_users: number;
+  max_resources: number;
+  rate_limit: number;
+  price_month: number;
+  users: number;
+  resources: number;
+  seats_remaining: number;
+  can_invite: boolean;
+};
+
+export type AuditEntry = {
+  id: number;
+  user_id: number | null;
+  username: string;
+  action: string;
+  resource: string;
+  detail: string;
+  created_at: string;
+};
+
+export type ApiKeyItem = {
+  id: number;
+  name: string;
+  prefix: string;
+  is_active: boolean;
+  last_used_at: string;
+  created_at: string;
+};
+
+export type ApiKeyCreated = ApiKeyItem & { key: string };
+
+export type InviteItem = {
+  id: number;
+  email: string;
+  role: string;
+  kind: string;
+  expires_at: string;
+  used_at: string;
+  created_at: string;
+};
+
+export type InviteLink = {
+  token: string;
+  link: string;
+  expires_at: string;
+};
+
+export type InvitePreview = {
+  email: string;
+  role: string;
+  org_name: string;
+  valid: boolean;
+};
+
 function authHeaders(): HeadersInit {
   const token = getToken();
   const headers: HeadersInit = { Accept: "application/json" };
@@ -142,6 +199,149 @@ export async function getMe(): Promise<SessionUser> {
 export function logout(): void {
   clearSession();
   if (typeof window !== "undefined") window.location.href = "/admin/login";
+}
+
+// ── Password reset & invites ─────────────────────────────────────────────────
+
+export async function forgotPassword(email: string): Promise<{ detail: string; dev_link?: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/password/forgot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (res.ok) return res.json();
+  throw await parseError(res, "Request failed");
+}
+
+export async function resetPassword(token: string, password: string): Promise<{ detail: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/password/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+  if (res.ok) return res.json();
+  throw await parseError(res, "Reset failed");
+}
+
+export async function previewInvite(token: string): Promise<InvitePreview> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/invite/${encodeURIComponent(token)}`);
+  if (res.ok) return res.json();
+  throw await parseError(res, "Invite invalid");
+}
+
+export async function acceptInvite(
+  token: string,
+  username: string,
+  password: string,
+): Promise<AdminUser> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/invite/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, username, password }),
+  });
+  if (res.ok) return res.json();
+  throw await parseError(res, "Could not accept invite");
+}
+
+export async function createInvite(email: string, role: string): Promise<InviteLink> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/invites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ email, role }),
+  });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to create invite");
+}
+
+export async function getInvites(): Promise<InviteItem[]> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/invites`, { headers: authHeaders() });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to fetch invites");
+}
+
+export async function revokeInvite(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/invites/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    handleAuthError(res.status);
+    throw await parseError(res, "Failed to revoke invite");
+  }
+}
+
+export async function adminResetLink(userId: number): Promise<InviteLink> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/reset-link`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to create reset link");
+}
+
+// ── Audit log ────────────────────────────────────────────────────────────────
+
+export async function getAuditLog(limit = 50, action = ""): Promise<AuditEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (action) params.set("action", action);
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit?${params}`, { headers: authHeaders() });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to fetch audit log");
+}
+
+// ── API keys ─────────────────────────────────────────────────────────────────
+
+export async function getApiKeys(): Promise<ApiKeyItem[]> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/api-keys`, { headers: authHeaders() });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to fetch API keys");
+}
+
+export async function createApiKey(name: string): Promise<ApiKeyCreated> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/api-keys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name }),
+  });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to create API key");
+}
+
+export async function deleteApiKey(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/api-keys/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    handleAuthError(res.status);
+    throw await parseError(res, "Failed to delete API key");
+  }
+}
+
+// ── Plan / billing ───────────────────────────────────────────────────────────
+
+export async function getPlanUsage(): Promise<PlanUsage> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/org/plan`, { headers: authHeaders() });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to fetch plan");
+}
+
+export async function updatePlan(plan: string): Promise<PlanUsage> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/org/plan`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ plan }),
+  });
+  if (res.ok) return res.json();
+  handleAuthError(res.status);
+  throw await parseError(res, "Failed to update plan");
 }
 
 // ── Users ────────────────────────────────────────────────────────────────────

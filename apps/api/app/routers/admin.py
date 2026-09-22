@@ -9,18 +9,28 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.audit import audit
 from app.auth import (
     create_access_token,
-    get_current_user,
     get_password_hash,
     require_permission,
     require_user,
     verify_password,
 )
+from app.config import get_settings
 from app.database import get_db
-from app.models import Organization, Resource, User
+from app.models import ApiKey, AuditLog, AuthToken, Organization, Resource, User
+from app.plans import PLANS, plan_for, valid_plan
 from app.rbac import Permission, permissions_for
 from app.schemas import ResourceRead
+from app.security import (
+    INVITE_TOKEN_TTL_HOURS,
+    RESET_TOKEN_TTL_HOURS,
+    new_api_key,
+    new_token,
+    token_expiry,
+    token_is_expired,
+)
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -145,6 +155,97 @@ class MeResponse(BaseModel):
     organization: OrgSettings | None
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=128)
+    password: str = Field(min_length=6, max_length=128)
+
+
+class InviteCreate(BaseModel):
+    email: EmailStr
+    role: str = "viewer"
+
+
+class InviteRead(BaseModel):
+    id: int
+    email: str
+    role: str
+    kind: str
+    expires_at: str
+    used_at: str
+    created_at: str
+
+
+class InvitePreview(BaseModel):
+    email: str
+    role: str
+    org_name: str
+    valid: bool
+
+
+class InviteAccept(BaseModel):
+    token: str = Field(min_length=10, max_length=128)
+    username: str = Field(min_length=3, max_length=80)
+    password: str = Field(min_length=6, max_length=128)
+
+
+class ResetLinkResponse(BaseModel):
+    token: str
+    link: str
+    expires_at: str
+
+
+class SetPasswordRequest(BaseModel):
+    password: str = Field(min_length=6, max_length=128)
+
+
+class AuditEntry(BaseModel):
+    id: int
+    user_id: int | None
+    username: str
+    action: str
+    resource: str
+    detail: str
+    created_at: str
+
+
+class ApiKeyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class ApiKeyRead(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    is_active: bool
+    last_used_at: str
+    created_at: str
+
+
+class ApiKeyCreated(ApiKeyRead):
+    key: str
+
+
+class PlanUsage(BaseModel):
+    plan: str
+    plan_name: str
+    max_users: int
+    max_resources: int
+    rate_limit: int
+    price_month: int
+    users: int
+    resources: int
+    seats_remaining: int
+    can_invite: bool
+
+
+class PlanUpdate(BaseModel):
+    plan: str
+
+
 VALID_ROLES = {"owner", "admin", "editor", "viewer"}
 VALID_INDUSTRIES = {"professional", "healthcare", "education"}
 
@@ -204,6 +305,27 @@ def _token_response(user: User, org: Organization | None) -> TokenResponse:
     )
 
 
+def _frontend_link(path: str) -> str:
+    return f"{get_settings().frontend_url.rstrip('/')}{path}"
+
+
+def _active_token(db: Session, token: str, kind: str) -> AuthToken | None:
+    row = db.query(AuthToken).filter(AuthToken.token == token, AuthToken.kind == kind).first()
+    if not row:
+        return None
+    if row.used_at or token_is_expired(row.expires_at):
+        return None
+    return row
+
+
+def _org_user_count(db: Session, org_id: int) -> int:
+    return db.query(func.count(User.id)).filter(User.org_id == org_id).scalar() or 0
+
+
+def _org_resource_count(db: Session, org_id: int) -> int:
+    return db.query(func.count(Resource.id)).filter(Resource.org_id == org_id).scalar() or 0
+
+
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 @auth_router.post("/login", response_model=TokenResponse)
@@ -213,6 +335,15 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")
+    audit(
+        db,
+        org_id=user.org_id,
+        user=user,
+        action="auth.login",
+        resource="auth",
+        detail=f"{user.username} signed in",
+        commit=True,
+    )
     org = db.get(Organization, user.org_id)
     return _token_response(user, org)
 
@@ -247,6 +378,15 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         created_at=datetime.now(timezone.utc).isoformat(),
     )
     db.add(user)
+    db.flush()
+    audit(
+        db,
+        org_id=org.id,
+        user=user,
+        action="org.registered",
+        resource="org",
+        detail=f"Workspace '{org.name}' created by {user.username}",
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -264,6 +404,130 @@ def get_me(user: User = Depends(require_user), db: Session = Depends(get_db)):
         permissions=permissions_for(user.role),
         organization=_org_read(org) if org else None,
     )
+
+
+# ── Password reset (self-service + admin-mediated; no SMTP required) ─────────
+
+@auth_router.post("/password/forgot")
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email).first()
+    settings_ = get_settings()
+    if user and user.is_active:
+        org = db.get(Organization, user.org_id)
+        token = new_token()
+        db.add(
+            AuthToken(
+                org_id=user.org_id,
+                user_id=user.id,
+                email=user.email,
+                username=user.username,
+                token=token,
+                kind="reset",
+                expires_at=token_expiry(RESET_TOKEN_TTL_HOURS),
+            )
+        )
+        audit(
+            db,
+            org_id=user.org_id,
+            user=user,
+            action="password.reset.requested",
+            resource="auth",
+            detail=f"Reset requested for {user.email}",
+        )
+        db.commit()
+        # Debug only: without SMTP we never return links in production.
+        if settings_.debug:
+            return {
+                "detail": "If that email exists, a reset link has been created.",
+                "dev_link": _frontend_link(f"/reset-password?token={token}"),
+            }
+        _ = org
+    return {"detail": "If that email exists, a reset link has been created."}
+
+
+@auth_router.post("/password/reset")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    row = _active_token(db, req.token, "reset")
+    if not row:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or has expired")
+    user = db.get(User, row.user_id) if row.user_id else None
+    if not user:
+        user = db.query(User).filter(User.email == row.email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Account no longer exists")
+    user.hashed_password = get_password_hash(req.password)
+    row.used_at = datetime.now(timezone.utc).isoformat()
+    # Invalidate any other outstanding reset tokens for this user
+    db.query(AuthToken).filter(
+        AuthToken.kind == "reset",
+        AuthToken.user_id == user.id,
+        AuthToken.used_at == "",
+    ).update({"used_at": row.used_at}, synchronize_session=False)
+    audit(
+        db,
+        org_id=user.org_id,
+        user=user,
+        action="password.reset.completed",
+        resource="auth",
+        detail=f"Password reset for {user.username}",
+    )
+    db.commit()
+    return {"detail": "Password updated. You can sign in now."}
+
+
+@auth_router.get("/invite/{token}", response_model=InvitePreview)
+def preview_invite(token: str, db: Session = Depends(get_db)):
+    row = _active_token(db, token, "invite")
+    if not row:
+        raise HTTPException(status_code=400, detail="Invite link is invalid or has expired")
+    org = db.get(Organization, row.org_id)
+    return InvitePreview(
+        email=row.email,
+        role=row.role,
+        org_name=org.name if org else "",
+        valid=True,
+    )
+
+
+@auth_router.post("/invite/accept", response_model=UserRead)
+def accept_invite(req: InviteAccept, db: Session = Depends(get_db)):
+    row = _active_token(db, req.token, "invite")
+    if not row:
+        raise HTTPException(status_code=400, detail="Invite link is invalid or has expired")
+    org = db.get(Organization, row.org_id)
+    if not org or not org.is_active:
+        raise HTTPException(status_code=403, detail="Workspace is inactive")
+    if db.query(User).filter(User.org_id == row.org_id, User.username == req.username).first():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    if db.query(User).filter(User.org_id == row.org_id, User.email == row.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    plan = plan_for(org.plan)
+    if _org_user_count(db, row.org_id) >= plan["max_users"]:
+        raise HTTPException(status_code=403, detail="Plan seat limit reached. Upgrade to invite more members.")
+
+    user = User(
+        org_id=row.org_id,
+        username=req.username,
+        email=row.email,
+        hashed_password=get_password_hash(req.password),
+        role=row.role if row.role in VALID_ROLES else "viewer",
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    db.add(user)
+    row.used_at = datetime.now(timezone.utc).isoformat()
+    db.flush()
+    audit(
+        db,
+        org_id=row.org_id,
+        user=user,
+        action="invite.accepted",
+        resource="users",
+        detail=f"{user.username} joined as {user.role}",
+    )
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 # ── Org settings ──────────────────────────────────────────────────────────────
@@ -311,9 +575,73 @@ def update_org_settings(
     if data.settings_json is not None:
         org.settings_json = json.dumps(data.settings_json)
 
+    audit(
+        db,
+        org_id=org.id,
+        user=user,
+        action="org.settings.updated",
+        resource="org",
+        detail=json.dumps(data.model_dump(exclude_none=True)),
+    )
     db.commit()
     db.refresh(org)
     return _org_read(org)
+
+
+# ── Plan / billing hooks ─────────────────────────────────────────────────────
+
+@org_router.get("/plan", response_model=PlanUsage)
+def get_plan(
+    user: User = Depends(require_permission(Permission.ORG_READ)),
+    db: Session = Depends(get_db),
+):
+    org = db.get(Organization, user.org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    info = plan_for(org.plan)
+    users = _org_user_count(db, org.id)
+    resources = _org_resource_count(db, org.id)
+    seats = max(info["max_users"] - users, 0)
+    return PlanUsage(
+        plan=org.plan,
+        plan_name=info["name"],
+        max_users=info["max_users"],
+        max_resources=info["max_resources"],
+        rate_limit=info["rate_limit"],
+        price_month=info["price_month"],
+        users=users,
+        resources=resources,
+        seats_remaining=seats,
+        can_invite=seats > 0,
+    )
+
+
+@org_router.put("/plan", response_model=PlanUsage)
+def update_plan(
+    body: PlanUpdate,
+    user: User = Depends(require_permission(Permission.ORG_WRITE)),
+    db: Session = Depends(get_db),
+):
+    if user.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Only owners/admins can change the plan")
+    if not valid_plan(body.plan):
+        raise HTTPException(status_code=422, detail=f"Plan must be one of: {', '.join(PLANS)}")
+    org = db.get(Organization, user.org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    old = org.plan
+    org.plan = body.plan
+    org.rate_limit = plan_for(body.plan)["rate_limit"]
+    audit(
+        db,
+        org_id=org.id,
+        user=user,
+        action="plan.changed",
+        resource="billing",
+        detail=f"{old} -> {body.plan}",
+    )
+    db.commit()
+    return get_plan(user=user, db=db)
 
 
 # ── Admin user management ────────────────────────────────────────────────────
@@ -346,6 +674,11 @@ def create_user(
     if db.query(User).filter(User.org_id == admin.org_id, User.email == req.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    org = db.get(Organization, admin.org_id)
+    plan = plan_for(org.plan if org else None)
+    if _org_user_count(db, admin.org_id) >= plan["max_users"]:
+        raise HTTPException(status_code=403, detail="Plan seat limit reached. Upgrade to invite more members.")
+
     new_user = User(
         org_id=admin.org_id,
         username=req.username,
@@ -355,6 +688,14 @@ def create_user(
         created_at=datetime.now(timezone.utc).isoformat(),
     )
     db.add(new_user)
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="user.created",
+        resource="users",
+        detail=f"{new_user.username} ({new_user.role})",
+    )
     db.commit()
     db.refresh(new_user)
     return new_user
@@ -377,7 +718,16 @@ def change_user_role(
         raise HTTPException(status_code=422, detail=f"Role must be one of: {', '.join(sorted(VALID_ROLES))}")
     if new_role == "owner" and admin.role != "owner":
         raise HTTPException(status_code=403, detail="Only the owner can grant owner role")
+    old_role = target.role
     target.role = new_role
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="user.role.changed",
+        resource="users",
+        detail=f"{target.username}: {old_role} -> {new_role}",
+    )
     db.commit()
     db.refresh(target)
     return target
@@ -396,9 +746,175 @@ def delete_user(
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     if target.role == "owner" and admin.role != "owner":
         raise HTTPException(status_code=403, detail="Only the owner can delete an owner")
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="user.deleted",
+        resource="users",
+        detail=f"{target.username} ({target.role})",
+    )
     db.delete(target)
     db.commit()
     return {"detail": "User deleted"}
+
+
+# ── Invites (email-link based; copy link manually when SMTP is off) ──────────
+
+@admin_router.get("/invites", response_model=list[InviteRead])
+def list_invites(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(Permission.USER_READ)),
+):
+    rows = (
+        db.query(AuthToken)
+        .filter(AuthToken.org_id == user.org_id, AuthToken.kind == "invite")
+        .order_by(AuthToken.id.desc())
+        .all()
+    )
+    return [
+        InviteRead(
+            id=r.id,
+            email=r.email,
+            role=r.role,
+            kind=r.kind,
+            expires_at=r.expires_at,
+            used_at=r.used_at,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+@admin_router.post("/invites", response_model=ResetLinkResponse)
+def create_invite(
+    body: InviteCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_permission(Permission.USER_WRITE)),
+):
+    if body.role not in VALID_ROLES:
+        raise HTTPException(status_code=422, detail=f"Role must be one of: {', '.join(sorted(VALID_ROLES))}")
+    if body.role == "owner" and admin.role != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner can invite an owner")
+    if db.query(User).filter(User.org_id == admin.org_id, User.email == body.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if db.query(AuthToken).filter(
+        AuthToken.org_id == admin.org_id,
+        AuthToken.email == body.email,
+        AuthToken.kind == "invite",
+        AuthToken.used_at == "",
+    ).first():
+        raise HTTPException(status_code=400, detail="An active invite already exists for this email")
+
+    org = db.get(Organization, admin.org_id)
+    plan = plan_for(org.plan if org else None)
+    if _org_user_count(db, admin.org_id) >= plan["max_users"]:
+        raise HTTPException(status_code=403, detail="Plan seat limit reached. Upgrade to invite more members.")
+
+    token = new_token()
+    expires = token_expiry(INVITE_TOKEN_TTL_HOURS)
+    db.add(
+        AuthToken(
+            org_id=admin.org_id,
+            email=body.email,
+            role=body.role,
+            token=token,
+            kind="invite",
+            expires_at=expires,
+            created_by=admin.id,
+        )
+    )
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="invite.created",
+        resource="users",
+        detail=f"{body.email} as {body.role}",
+    )
+    db.commit()
+    return ResetLinkResponse(token=token, link=_frontend_link(f"/invite?token={token}"), expires_at=expires)
+
+
+@admin_router.delete("/invites/{invite_id}")
+def revoke_invite(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_permission(Permission.USER_WRITE)),
+):
+    row = db.get(AuthToken, invite_id)
+    if not row or row.org_id != admin.org_id or row.kind != "invite":
+        raise HTTPException(status_code=404, detail="Invite not found")
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="invite.revoked",
+        resource="users",
+        detail=f"{row.email}",
+    )
+    db.delete(row)
+    db.commit()
+    return {"detail": "Invite revoked"}
+
+
+@admin_router.post("/users/{user_id}/reset-link", response_model=ResetLinkResponse)
+def admin_reset_link(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_permission(Permission.USER_WRITE)),
+):
+    target = db.get(User, user_id)
+    if not target or target.org_id != admin.org_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    token = new_token()
+    expires = token_expiry(RESET_TOKEN_TTL_HOURS)
+    db.add(
+        AuthToken(
+            org_id=target.org_id,
+            user_id=target.id,
+            email=target.email,
+            username=target.username,
+            token=token,
+            kind="reset",
+            expires_at=expires,
+            created_by=admin.id,
+        )
+    )
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="password.reset.link.created",
+        resource="users",
+        detail=f"Reset link for {target.username}",
+    )
+    db.commit()
+    return ResetLinkResponse(token=token, link=_frontend_link(f"/reset-password?token={token}"), expires_at=expires)
+
+
+@admin_router.put("/users/{user_id}/password", response_model=UserRead)
+def admin_set_password(
+    user_id: int,
+    body: SetPasswordRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_permission(Permission.USER_WRITE)),
+):
+    target = db.get(User, user_id)
+    if not target or target.org_id != admin.org_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    target.hashed_password = get_password_hash(body.password)
+    audit(
+        db,
+        org_id=admin.org_id,
+        user=admin,
+        action="password.reset.by_admin",
+        resource="users",
+        detail=f"Password set for {target.username}",
+    )
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 # ── Admin resource CRUD ──────────────────────────────────────────────────────
@@ -517,6 +1033,14 @@ async def import_csv(
         except Exception as e:
             errors.append(f"Row {i}: {e}")
 
+    audit(
+        db,
+        org_id=user.org_id,
+        user=user,
+        action="resources.imported",
+        resource="resources",
+        detail=f"created={created} updated={updated} errors={len(errors)}",
+    )
     db.commit()
     return {"created": created, "updated": updated, "errors": errors,
             "total_processed": created + updated + len(errors)}
@@ -595,3 +1119,114 @@ def get_admin_stats(
         deployable_count=db.query(func.count(Resource.id)).filter(org_filter, Resource.deployable == "Deployable").scalar() or 0,
         critical_count=db.query(func.count(Resource.id)).filter(org_filter, Resource.age_bucket == "91+ days").scalar() or 0,
     )
+
+
+# ── Audit log ────────────────────────────────────────────────────────────────
+
+@admin_router.get("/audit", response_model=list[AuditEntry])
+def list_audit(
+    limit: int = 50,
+    action: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(Permission.ORG_WRITE)),
+):
+    q = db.query(AuditLog).filter(AuditLog.org_id == user.org_id)
+    if action:
+        q = q.filter(AuditLog.action == action)
+    rows = q.order_by(AuditLog.id.desc()).limit(min(max(limit, 1), 200)).all()
+    return [
+        AuditEntry(
+            id=r.id,
+            user_id=r.user_id,
+            username=r.username,
+            action=r.action,
+            resource=r.resource,
+            detail=r.detail,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+# ── API keys ─────────────────────────────────────────────────────────────────
+
+@admin_router.get("/api-keys", response_model=list[ApiKeyRead])
+def list_api_keys(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(Permission.ORG_WRITE)),
+):
+    rows = (
+        db.query(ApiKey)
+        .filter(ApiKey.org_id == user.org_id)
+        .order_by(ApiKey.id.desc())
+        .all()
+    )
+    return [
+        ApiKeyRead(
+            id=r.id,
+            name=r.name,
+            prefix=r.prefix,
+            is_active=r.is_active,
+            last_used_at=r.last_used_at,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+@admin_router.post("/api-keys", response_model=ApiKeyCreated)
+def create_api_key(
+    body: ApiKeyCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(Permission.ORG_WRITE)),
+):
+    full_key, prefix, key_hash = new_api_key()
+    row = ApiKey(
+        org_id=user.org_id,
+        name=body.name,
+        prefix=prefix,
+        key_hash=key_hash,
+        created_by=user.id,
+    )
+    db.add(row)
+    audit(
+        db,
+        org_id=user.org_id,
+        user=user,
+        action="api_key.created",
+        resource="api_keys",
+        detail=f"{body.name} ({prefix})",
+    )
+    db.commit()
+    db.refresh(row)
+    return ApiKeyCreated(
+        id=row.id,
+        name=row.name,
+        prefix=row.prefix,
+        is_active=row.is_active,
+        last_used_at=row.last_used_at,
+        created_at=row.created_at,
+        key=full_key,
+    )
+
+
+@admin_router.delete("/api-keys/{key_id}")
+def delete_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(Permission.ORG_WRITE)),
+):
+    row = db.get(ApiKey, key_id)
+    if not row or row.org_id != user.org_id:
+        raise HTTPException(status_code=404, detail="API key not found")
+    audit(
+        db,
+        org_id=user.org_id,
+        user=user,
+        action="api_key.deleted",
+        resource="api_keys",
+        detail=f"{row.name} ({row.prefix})",
+    )
+    db.delete(row)
+    db.commit()
+    return {"detail": "API key deleted"}

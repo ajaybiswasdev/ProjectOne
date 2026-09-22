@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, Header, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import User
+from app.models import ApiKey, User
 from app.rbac import Permission, has_permission
+from app.security import hash_api_key
 
 settings = get_settings()
 SECRET_KEY = settings.secret_key
@@ -36,20 +37,38 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def _user_from_api_key(api_key: str, db: Session) -> User | None:
+    key_hash = hash_api_key(api_key)
+    row = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.is_active.is_(True)).first()
+    if not row:
+        return None
+    row.last_used_at = datetime.now(timezone.utc).isoformat()
+    db.commit()
+    user = db.get(User, row.created_by) if row.created_by else None
+    if user and not user.is_active:
+        return None
+    if user and user.org_id != row.org_id:
+        return None
+    return user
+
+
 def get_current_user(
     token: str | None = Depends(oauth2_scheme),
+    api_key: str | None = Header(default=None, alias="X-API-Key"),
     db: Session = Depends(get_db),
 ) -> User | None:
-    if not token:
-        return None
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str | None = payload.get("sub")
-        if username is None:
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username: str | None = payload.get("sub")
+            if username is None:
+                return None
+        except JWTError:
             return None
-    except JWTError:
-        return None
-    return db.query(User).filter(User.username == username).first()
+        return db.query(User).filter(User.username == username).first()
+    if api_key:
+        return _user_from_api_key(api_key, db)
+    return None
 
 
 def require_user(user: User | None = Depends(get_current_user)) -> User:

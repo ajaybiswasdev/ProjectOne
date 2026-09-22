@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://bench_user:bench_password@localhost:5432/bench_dashboard"
     secret_key: str = "change-me-in-production-use-openssl-rand-hex-32"
 
+    frontend_url: str = "http://localhost:3000"
+
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",

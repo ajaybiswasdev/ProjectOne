@@ -159,6 +159,11 @@ export default function AdminLoginPage() {
         </form>
 
         <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "#a0aec0" }}>
+          <Link href="/forgot-password" style={{ color: "#6366f1", fontWeight: 700 }}>
+            Forgot password?
+          </Link>
+        </p>
+        <p style={{ textAlign: "center", marginTop: 8, fontSize: 13, color: "#a0aec0" }}>
           Don&apos;t have an account?{" "}
           <Link href="/register" style={{ color: "#6366f1", fontWeight: 700 }}>
             Create one

@@ -10,6 +10,9 @@ const navLinks = [
   { href: "/admin/resources", label: "Resources", icon: "📦", permission: "resource:read" },
   { href: "/admin/import", label: "Import / Export", icon: "📥", permission: "data:import" },
   { href: "/admin/users", label: "Users", icon: "👥", permission: "user:read" },
+  { href: "/admin/audit", label: "Audit Log", icon: "🧾", permission: "org:write" },
+  { href: "/admin/api-keys", label: "API Keys", icon: "🔑", permission: "org:write" },
+  { href: "/admin/billing", label: "Billing", icon: "💳", permission: "org:read" },
   { href: "/admin/settings", label: "Settings", icon: "⚙️", permission: "org:read" },
 ];
 
