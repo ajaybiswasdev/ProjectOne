@@ -293,6 +293,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         }
         .admin-main {
           margin-left: 240px !important;
+          width: calc(100% - 240px) !important;
         }
         @media (max-width: 768px) {
           .admin-hamburger {
