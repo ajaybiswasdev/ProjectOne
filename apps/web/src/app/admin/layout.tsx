@@ -110,11 +110,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    if (!isAdminLoggedIn() && pathname !== "/admin/login") {
+    if (pathname === "/admin/login") {
+      setAuthorized(true);
+      return;
+    }
+    if (isAdminLoggedIn()) {
+      setAuthorized(true);
+    } else {
       router.push("/admin/login");
     }
   }, [pathname, router]);
@@ -123,7 +128,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  if (!mounted) return null;
+  if (!authorized) return null;
 
   function handleLogout() {
     localStorage.removeItem("admin_token");
