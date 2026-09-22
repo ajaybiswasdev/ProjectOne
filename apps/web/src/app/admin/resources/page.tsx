@@ -333,7 +333,7 @@ export default function AdminResourcesPage() {
       {/* Add/Edit Modal */}
       {showForm && (
         <div style={overlayStyle} onClick={() => setShowForm(false)}>
-          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+          <div style={modalStyle} className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
                 {editId ? "Edit Resource" : "Add Resource"}

@@ -228,7 +228,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       >
         {/* Top bar */}
         <header
-          className="neo"
+          className="neo admin-topbar"
           style={{
             padding: "12px 20px",
             marginBottom: 16,
@@ -294,6 +294,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         .admin-main {
           margin-left: 240px !important;
           width: calc(100% - 240px) !important;
+          box-sizing: border-box;
+        }
+        .admin-topbar {
+          padding: 12px 20px !important;
+        }
+        .admin-topbar h1 {
+          font-size: 18px;
         }
         @media (max-width: 768px) {
           .admin-hamburger {
@@ -307,7 +314,34 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           }
           .admin-main {
             margin-left: 0 !important;
+            width: 100% !important;
             padding-top: 56px !important;
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+          .admin-topbar {
+            padding: 10px 12px !important;
+            margin-bottom: 12px !important;
+          }
+          .admin-topbar h1 {
+            font-size: 15px !important;
+            margin-left: 40px !important;
+          }
+          .admin-topbar p {
+            display: none !important;
+          }
+          .neo {
+            border-radius: 14px !important;
+          }
+          .admin-modal {
+            padding: 20px 16px !important;
+            border-radius: 16px !important;
+            margin: 0 8px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .admin-topbar h1 {
+            font-size: 14px !important;
           }
         }
       `}</style>
