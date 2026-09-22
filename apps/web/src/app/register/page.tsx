@@ -3,29 +3,61 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { adminLogin } from "@/lib/adminApi";
+import { publicRegister } from "@/lib/adminApi";
 
-export default function AdminLoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (password !== confirm) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
     setLoading(true);
     try {
-      const data = await adminLogin(username, password);
-      localStorage.setItem("admin_token", data.access_token);
-      router.push("/admin");
+      await publicRegister(username, email, password);
+      router.push("/admin/login");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
   }
+
+  const inputStyle = {
+    width: "100%",
+    padding: "12px 16px",
+    borderRadius: 10,
+    border: "none",
+    background: "#e8eaf6",
+    boxShadow: "inset 3px 3px 8px #b0b8d8, inset -3px -3px 8px #ffffff",
+    fontSize: 13,
+    color: "#1e293b",
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
+
+  const labelStyle = {
+    display: "block" as const,
+    fontSize: 11,
+    fontWeight: 700 as const,
+    color: "#a0aec0",
+    marginBottom: 6,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.8,
+  };
 
   return (
     <div
@@ -41,7 +73,7 @@ export default function AdminLoginPage() {
       <div
         style={{
           width: "100%",
-          maxWidth: 400,
+          maxWidth: 420,
           padding: 40,
           borderRadius: 20,
           background: "#e8eaf6",
@@ -64,12 +96,12 @@ export default function AdminLoginPage() {
               boxShadow: "4px 4px 10px #b0b8d8, -4px -4px 10px #ffffff",
             }}
           >
-            🔒
+            ✏️
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1e293b", marginBottom: 4 }}>
-            Admin Panel
+            Create Account
           </h1>
-          <p style={{ fontSize: 13, color: "#a0aec0" }}>Sign in to continue</p>
+          <p style={{ fontSize: 13, color: "#a0aec0" }}>Register to get started</p>
         </div>
 
         {error && (
@@ -90,50 +122,48 @@ export default function AdminLoginPage() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#a0aec0", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
-              Username
-            </label>
+            <label style={labelStyle}>Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: 10,
-                border: "none",
-                background: "#e8eaf6",
-                boxShadow: "inset 3px 3px 8px #b0b8d8, inset -3px -3px 8px #ffffff",
-                fontSize: 13,
-                color: "#1e293b",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
+              minLength={3}
+              style={inputStyle}
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#a0aec0", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
-              Password
-            </label>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: 10,
-                border: "none",
-                background: "#e8eaf6",
-                boxShadow: "inset 3px 3px 8px #b0b8d8, inset -3px -3px 8px #ffffff",
-                fontSize: 13,
-                color: "#1e293b",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
+              minLength={6}
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <label style={labelStyle}>Confirm Password</label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              style={inputStyle}
             />
           </div>
 
@@ -155,14 +185,14 @@ export default function AdminLoginPage() {
               transition: "opacity .18s",
             }}
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Creating account..." : "Create Account"}
           </button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "#a0aec0" }}>
-          Don&apos;t have an account?{" "}
-          <Link href="/register" style={{ color: "#6366f1", fontWeight: 700 }}>
-            Create one
+          Already have an account?{" "}
+          <Link href="/admin/login" style={{ color: "#6366f1", fontWeight: 700 }}>
+            Sign in
           </Link>
         </p>
       </div>

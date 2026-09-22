@@ -67,7 +67,7 @@ export async function adminLogin(username: string, password: string): Promise<{ 
 }
 
 export async function adminRegister(username: string, email: string, password: string, role: string): Promise<AdminUser> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+  const res = await fetch(`${API_BASE_URL}/api/v1/admin/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ username, email, password, role }),
@@ -75,6 +75,17 @@ export async function adminRegister(username: string, email: string, password: s
   if (res.ok) return res.json();
   handleAuthError(res.status);
   const err = await res.json().catch(() => ({ detail: "Request failed" }));
+  throw new Error(err.detail || "Registration failed");
+}
+
+export async function publicRegister(username: string, email: string, password: string): Promise<AdminUser> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password, role: "viewer" }),
+  });
+  if (res.ok) return res.json();
+  const err = await res.json().catch(() => ({ detail: "Registration failed" }));
   throw new Error(err.detail || "Registration failed");
 }
 

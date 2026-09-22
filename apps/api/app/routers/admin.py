@@ -39,7 +39,7 @@ class RegisterRequest(BaseModel):
     username: str
     email: str
     password: str
-    role: str = "admin"
+    role: str = "viewer"
 
 
 class UserRead(BaseModel):
@@ -113,13 +113,11 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already taken")
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    if req.role not in ("admin", "viewer"):
-        raise HTTPException(status_code=422, detail="Role must be admin or viewer")
     user = User(
         username=req.username,
         email=req.email,
         hashed_password=get_password_hash(req.password),
-        role=req.role,
+        role="viewer",
         created_at=datetime.now(timezone.utc).isoformat(),
     )
     db.add(user)
@@ -143,6 +141,31 @@ def list_users(
     _admin: User = Depends(require_admin),
 ):
     return db.query(User).order_by(User.id).all()
+
+
+@admin_router.post("/users", response_model=UserRead)
+def create_user(
+    req: RegisterRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    if db.query(User).filter(User.username == req.username).first():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    if db.query(User).filter(User.email == req.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if req.role not in ("admin", "editor", "viewer"):
+        raise HTTPException(status_code=422, detail="Role must be admin, editor, or viewer")
+    user = User(
+        username=req.username,
+        email=req.email,
+        hashed_password=get_password_hash(req.password),
+        role=req.role,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @admin_router.delete("/users/{user_id}")
