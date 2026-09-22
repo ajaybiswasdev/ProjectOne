@@ -267,6 +267,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             >
               👤 Admin
             </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 20,
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#e97b8a",
+                background: "#e8eaf6",
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "2px 2px 6px #b0b8d8, -2px -2px 6px #ffffff",
+              }}
+            >
+              🚪 Logout
+            </button>
           </div>
         </header>
 
