@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # ── Chatbot (OpenAI-compatible: works with OpenAI, OpenRouter, Groq, Ollama…) ──
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = "gpt-6-luna"
     llm_max_tokens: int = 900
     llm_timeout_seconds: float = 45.0
 

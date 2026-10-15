@@ -345,23 +345,62 @@ def _execute_tool(name: str, args: dict[str, Any], user: User, db: Session) -> s
         return json.dumps({"error": f"Tool {name} failed"})
 
 
+# Learned payload adjustments per model (token param name, reasoning_effort, ...)
+# so the first 400 self-heal is remembered and later calls skip the wasted round-trip.
+_PAYLOAD_OVERRIDES: dict[str, dict[str, Any]] = {}
+
+
 def _call_llm(messages: list[dict[str, Any]]) -> dict[str, Any]:
     cfg = get_settings()
+    # Newer OpenAI models require max_completion_tokens; older ones/providers use max_tokens.
+    token_param = "max_tokens" if cfg.llm_model.startswith(("gpt-4o", "gpt-3.5", "gpt-4")) else "max_completion_tokens"
+    overrides: dict[str, Any] = dict(_PAYLOAD_OVERRIDES.get(cfg.llm_model, {}))
     payload: dict[str, Any] = {
         "model": cfg.llm_model,
         "messages": messages,
         "tools": TOOL_SCHEMAS,
         "tool_choice": "auto",
         "temperature": 0.2,
-        "max_tokens": cfg.llm_max_tokens,
+        token_param: cfg.llm_max_tokens,
+        **overrides,
     }
+    url = f"{cfg.llm_base_url.rstrip('/')}/chat/completions"
+    headers = {"Authorization": f"Bearer {cfg.llm_api_key}"}
     try:
         with httpx.Client(timeout=cfg.llm_timeout_seconds) as client:
-            resp = client.post(
-                f"{cfg.llm_base_url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {cfg.llm_api_key}"},
-                json=payload,
-            )
+            resp = client.post(url, headers=headers, json=payload)
+            # Some models change parameter names or defaults for function tools.
+            # Patch the payload from the provider's error text and retry a few times.
+            for _ in range(3):
+                if resp.status_code != 400:
+                    break
+                text = (resp.text or "").lower()
+                patched = False
+                if token_param in text:
+                    other = "max_completion_tokens" if token_param == "max_tokens" else "max_tokens"
+                    payload.pop(token_param, None)
+                    payload[other] = cfg.llm_max_tokens
+                    overrides.pop(token_param, None)
+                    overrides[other] = cfg.llm_max_tokens
+                    token_param = other
+                    patched = True
+                if "reasoning_effort" in text:
+                    sent = "reasoning_effort" in payload
+                    unsupported_param = "unsupported parameter" in text
+                    if not sent and not unsupported_param:
+                        # e.g. "Function tools with reasoning_effort are not supported ... set reasoning_effort to 'none'"
+                        payload["reasoning_effort"] = "none"
+                        overrides["reasoning_effort"] = "none"
+                        patched = True
+                    elif sent and unsupported_param:
+                        payload.pop("reasoning_effort", None)
+                        overrides.pop("reasoning_effort", None)
+                        patched = True
+                if not patched:
+                    break
+                resp = client.post(url, headers=headers, json=payload)
+            if resp.status_code == 200 and overrides != _PAYLOAD_OVERRIDES.get(cfg.llm_model):
+                _PAYLOAD_OVERRIDES[cfg.llm_model] = overrides
     except httpx.TimeoutException as exc:
         raise HTTPException(status_code=504, detail="The AI model timed out. Please try again.") from exc
     except httpx.HTTPError as exc:
