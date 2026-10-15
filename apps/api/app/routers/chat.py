@@ -371,7 +371,20 @@ def _call_llm(messages: list[dict[str, Any]]) -> dict[str, Any]:
     if resp.status_code in (401, 403):
         raise HTTPException(status_code=502, detail="AI provider rejected the API key. Ask an admin to check LLM_API_KEY.")
     if resp.status_code == 429:
-        raise HTTPException(status_code=429, detail="AI provider rate limit reached. Please wait a moment and retry.")
+        message = "AI provider rate limit reached. Please wait a moment and retry."
+        code = ""
+        try:
+            err = resp.json().get("error", {})
+            message = err.get("message", message) or message
+            code = err.get("code", "") or ""
+        except Exception:
+            pass
+        if "quota" in message.lower() or "credit" in message.lower() or code in {"insufficient_quota", "credit_balance_exhausted"}:
+            raise HTTPException(
+                status_code=502,
+                detail="The AI service is out of credit. An admin needs to top up the LLM account balance.",
+            )
+        raise HTTPException(status_code=429, detail=message)
     if resp.status_code >= 400:
         detail = "The AI model returned an error."
         try:
