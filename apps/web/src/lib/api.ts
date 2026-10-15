@@ -156,3 +156,44 @@ export function getDesignations(params?: Record<string, string>) {
 export function getFilters() {
   return apiFetch<FilterOptions>("/filters");
 }
+
+// ── Chat (AI data Q&A) ────────────────────────────────────────────────────────
+
+export type ChatTurn = { role: "user" | "assistant"; content: string };
+export type ChatResult = {
+  reply: string;
+  tools_used: string[];
+  configured: boolean;
+};
+
+export async function postChat(message: string, history: ChatTurn[] = []): Promise<ChatResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeader() },
+      body: JSON.stringify({ message, history: history.slice(-12) }),
+    });
+    if (!response.ok) {
+      if (response.status === 401 && typeof window !== "undefined") {
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_user");
+        if (!window.location.pathname.startsWith("/admin/login")) {
+          window.location.replace("/admin/login");
+        }
+      }
+      const err = await response.json().catch(() => ({ detail: "Chat failed" }));
+      throw new Error(err.detail || "Chat failed");
+    }
+    return (await response.json()) as ChatResult;
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("The assistant took too long. Please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}

@@ -14,6 +14,7 @@ from app.database import Base, SessionLocal, engine
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 from app.models import Organization, Resource, User
 from app.routers.admin import admin_router, auth_router, org_router
+from app.routers.chat import chat_router
 from app.routers.resources import analytics_router, router as resources_router, summary_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -221,3 +222,4 @@ app.include_router(analytics_router, prefix=settings.api_prefix)
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(admin_router, prefix=settings.api_prefix)
 app.include_router(org_router, prefix=settings.api_prefix)
+app.include_router(chat_router, prefix=settings.api_prefix)

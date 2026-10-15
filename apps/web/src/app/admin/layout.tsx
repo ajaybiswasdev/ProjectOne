@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useState, useEffect } from "react";
 import { getSessionUser, isLoggedIn, applyBranding, clearSession, type SessionUser } from "@/lib/session";
+import ChatWidget from "@/components/ChatWidget";
 
 const navLinks = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
@@ -329,6 +330,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className="dash-content">{children}</div>
       </main>
+
+      <ChatWidget />
 
       {/* Responsive CSS */}
       <style jsx global>{`

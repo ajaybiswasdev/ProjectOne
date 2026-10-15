@@ -15,6 +15,7 @@ import SkillsScreen from "./src/screens/SkillsScreen";
 import PipelineScreen from "./src/screens/PipelineScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import LocationScreen from "./src/screens/LocationScreen";
+import ChatScreen from "./src/screens/ChatScreen";
 
 const TABS = [
   { key: "overview", label: "📊 Overview", a11yLabel: "Overview dashboard" },
@@ -23,6 +24,7 @@ const TABS = [
   { key: "pipeline", label: "🎯 Pipeline", a11yLabel: "IFB pipeline" },
   { key: "register", label: "📋 Register", a11yLabel: "Bench register" },
   { key: "location", label: "📍 Location", a11yLabel: "Location and experience" },
+  { key: "chat", label: "💬 Chat", a11yLabel: "AI data assistant chat" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -34,6 +36,7 @@ const TAB_TITLES: Record<TabKey, string> = {
   pipeline: "IFB Pipeline",
   register: "Bench Register",
   location: "Location & Experience",
+  chat: "Data Assistant",
 };
 
 const TAB_SUBTITLES: Record<TabKey, string> = {
@@ -43,6 +46,7 @@ const TAB_SUBTITLES: Record<TabKey, string> = {
   pipeline: "IFB shortlist & pipeline tracking",
   register: "Searchable resource-level register",
   location: "Office, experience & designation mix",
+  chat: "Ask questions about your workforce data",
 };
 
 export default function App() {
@@ -253,18 +257,22 @@ export default function App() {
         <Text style={styles.tabInfoSubtitle}>{TAB_SUBTITLES[tab]}</Text>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        {tab === "overview" && <OverviewScreen />}
-        {tab === "aging" && <AgingScreen />}
-        {tab === "skills" && <SkillsScreen />}
-        {tab === "pipeline" && <PipelineScreen />}
-        {tab === "register" && <RegisterScreen />}
-        {tab === "location" && <LocationScreen />}
-      </ScrollView>
+      {tab === "chat" ? (
+        <ChatScreen />
+      ) : (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {tab === "overview" && <OverviewScreen />}
+          {tab === "aging" && <AgingScreen />}
+          {tab === "skills" && <SkillsScreen />}
+          {tab === "pipeline" && <PipelineScreen />}
+          {tab === "register" && <RegisterScreen />}
+          {tab === "location" && <LocationScreen />}
+        </ScrollView>
+      )}
 
       <View style={styles.footerBar}>
         <Text style={styles.footerText}>🏖️ Bench Management Dashboard</Text>

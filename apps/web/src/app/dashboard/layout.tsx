@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { applyBranding, getSessionUser, isLoggedIn } from "@/lib/session";
+import ChatWidget from "@/components/ChatWidget";
 
 const tabs = [
   { href: "/dashboard/overview", label: "Overview", icon: "📊" },
@@ -87,6 +88,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <span>🏖️ Bench Management Dashboard · Data &amp; AI Practice</span>
         <span>Source: Bench Data from RMG · Live data</span>
       </div>
+
+      <ChatWidget />
     </>
   );
 }
