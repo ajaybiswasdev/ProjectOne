@@ -35,3 +35,8 @@ apps/mobile/ios/build/
 Thumbs.db
 .idea/
 .vscode/
+
+# local test sqlite
+smoke.db
+apps/api/smoke.db
+*.db
