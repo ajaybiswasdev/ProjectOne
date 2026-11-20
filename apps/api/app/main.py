@@ -68,7 +68,17 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/api/v1/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "2.0.0"}
+    out: dict[str, str] = {"status": "ok", "version": "2.0.0"}
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        out["db"] = "ok"
+    except Exception as exc:  # TEMPORARY diagnostic — remove after debugging
+        import re
+
+        msg = re.sub(r"://[^@\s]+@", "://***@", str(exc))
+        out["db"] = "error: " + msg[:400]
+    return out
 
 
 # ── Auto-setup: create tables + migrate + seed on first start ────────────────
